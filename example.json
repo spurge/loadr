@@ -1,0 +1,27 @@
+[
+	{
+		"name": "session",
+		"method": "POST",
+		"url": "http://host/create-session",
+		"body": {
+			"key": "sdlkfj"
+		}
+	},
+	{
+		"method": "POST",
+		"url": "http://host/create-stuff",
+		"headers": [
+			"Authorization": "Bearer {{from('session').body.token}}"
+		],
+		"body": {
+			"some-key": "with data"
+		}
+	},
+	{
+		"method": "GET",
+		"url": "http://host/stuff/{{from(1).body.stuff_id}}/status",
+		"headers": [
+			"Authorization": "Bearer {{from(0).body.token}}"
+		]
+	}
+]
