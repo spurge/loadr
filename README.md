@@ -1,7 +1,7 @@
 loadr
 =====
 
-loadr.py
+loadr
 -------
 
 * Takes arguments:

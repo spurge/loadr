@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+
+import click
+import json
+
+from requests import Request, Session
+
+
+def parseConfigFile(file):
+    return parseConfigJSON(json.loads(file.read(), 'utf-8'))
+
+
+def parseConfigJSON(config):
+    return config
+
+
+def parseConfigValue(data, key):
+    if key in data:
+        val = data[key]
+
+        return val
+
+    return None
+
+
+def runRequest(data, sess):
+    req = Request(data['method'],
+                  parseConfigValue(data, 'url'),
+                  headers=parseConfigValue(data, 'headers'),
+                  data=parseConfigValue(data, 'body'))
+
+    res = sess.send(sess.prepare_request(req))
+
+
+@click.command()
+@click.argument('file', type=click.File('r'))
+def run(file):
+    reqs = parseConfigFile(file)
+    sess = Session()
+
+    for data in reqs:
+        runRequest(data, sess)
+
+
+if __name__ == '__main__':
+    run()

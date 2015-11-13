@@ -10,9 +10,9 @@
 	{
 		"method": "POST",
 		"url": "http://host/create-stuff",
-		"headers": [
+		"headers": {
 			"Authorization": "Bearer {{from('session').body.token}}"
-		],
+		},
 		"body": {
 			"some-key": "with data"
 		}
@@ -20,8 +20,8 @@
 	{
 		"method": "GET",
 		"url": "http://host/stuff/{{from(1).body.stuff_id}}/status",
-		"headers": [
+		"headers": {
 			"Authorization": "Bearer {{from(0).body.token}}"
-		]
+		}
 	}
 ]
