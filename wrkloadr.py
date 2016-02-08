@@ -6,6 +6,7 @@ import json
 import sys
 
 from requests import Request, Session
+from re import finditer
 from time import time
 
 
@@ -14,34 +15,50 @@ def millisec():
 
 
 def parseConfigFile(file):
-    return parseConfigJSON(json.loads(file.read(), 'utf-8'))
+    config = json.loads(file.read(), 'utf-8')
+    defaults = {'method': 'GET', 'headers': None, 'body': None}
 
+    for cycle in config:
+        for key, val in defaults.items():
+            if not key in cycle:
+                cycle[key] = val
 
-def parseConfigJSON(config):
     return config
 
 
-def parseConfigValue(data, key, history):
-    if key in data:
-        val = data[key]
+def parseConfigCycle(data, history):
+    if type(data) is str:
+        for match in finditer('{{(.+?)}}', data):
+            sys.stdout.write(match.group(1))
 
-        return val
+        return data
 
-    return None
+    if type(data) is dict:
+        config = {}
+
+        for key, val in data.items():
+            config[key] = parseConfigCycle(val, history)
+
+        return config
+
+    return data
 
 
 def runRequest(cycle, sess, history):
-    req = Request(cycle['method'],
-                  parseConfigValue(cycle, 'url', history),
-                  headers=parseConfigValue(cycle, 'headers', history),
-                  data=parseConfigValue(cycle, 'body', history))
+    config = parseConfigCycle(cycle, history)
+    req = Request(config['method'],
+                  config['url'],
+                  headers=config['headers'],
+                  data=config['body'])
 
     try:
         res = sess.send(sess.prepare_request(req))
-        type = res.headers['content-type']
+        contenttype = res.headers['content-type']
 
-        if type == 'application/json' or type == 'text/json':
-            return {'data': res.json()}
+        if contenttype == 'application/json' or contenttype == 'text/json':
+            res.body = res.json()
+
+        return res
     except ConnectionError as e:
         return {'error': 'Connection Error'}
 
@@ -58,15 +75,18 @@ def run(cycles, output, config):
     writer = csv.writer(output)
     reqs = parseConfigFile(config)
     sess = Session()
-    history = None
 
     for ci in range(0, cycles):
+        history = []
+
         for cycle in reqs:
             starttime = millisec()
-            history = runRequest(cycle, sess, history)
+            res = runRequest(cycle, sess, history)
+            history += res
             endtime = millisec() - starttime
             writer.writerow([ci,
                              cycle['url'],
+                             res.status_code,
                              endtime])
 
 
