@@ -14,22 +14,44 @@ def millisec():
     return int(round(time() * 1000))
 
 
-def parseConfigFile(file):
+def loadconfig(file):
     config = json.loads(file.read(), 'utf-8')
-    defaults = {'method': 'GET', 'headers': None, 'body': None}
+    defaults = {'method': 'GET',
+                'headers': None,
+                'body': None}
 
-    for cycle in config:
+    for req in config:
         for key, val in defaults.items():
-            if not key in cycle:
-                cycle[key] = val
+            if not key in req:
+                req[key] = val
 
     return config
 
 
-def parseConfigCycle(data, history):
+def parseconfig(data, history):
     if type(data) is str:
-        for match in finditer('{{(.+?)}}', data):
-            sys.stdout.write(match.group(1))
+        for match in finditer('{{from\(([^)]+)\)\.(.+?)}}', data):
+            if match.group(1) in history:
+                prop = history[match.group(1)]
+                keys = match.group(2).split('.')
+
+                if keys[0] == 'body':
+                    prop = prop.body
+                if keys[0] == 'headers':
+                    prop = prop.headers
+                else:
+                    break
+
+                for k in keys[1:]:
+                    if k in prop:
+                        prop = prop[k]
+                        continue
+
+                    prop = None
+                    break
+
+                if prop != None:
+                    data = data.replace(match.group(0), prop)
 
         return data
 
@@ -37,25 +59,25 @@ def parseConfigCycle(data, history):
         config = {}
 
         for key, val in data.items():
-            config[key] = parseConfigCycle(val, history)
+            config[key] = parseconfig(val, history)
 
         return config
 
     return data
 
 
-def runRequest(cycle, sess, history):
-    config = parseConfigCycle(cycle, history)
+def runRequest(config, sess, history):
+    config = parseconfig(config, history)
     req = Request(config['method'],
                   config['url'],
                   headers=config['headers'],
-                  data=config['body'])
+                  data=json.dumps(config['body']))
 
     try:
         res = sess.send(sess.prepare_request(req))
         contenttype = res.headers['content-type']
 
-        if contenttype == 'application/json' or contenttype == 'text/json':
+        if contenttype[:16] == 'application/json':
             res.body = res.json()
 
         return res
@@ -67,27 +89,33 @@ def runRequest(cycle, sess, history):
 @click.command()
 @click.option('-c', '--cycles', default=1)
 @click.option('-o', '--output', default=sys.stdout)
-@click.argument('config', type=click.File('r'), default=sys.stdin)
-def run(cycles, output, config):
+@click.argument('configfile', type=click.File('r'), default=sys.stdin)
+def run(cycles, output, configfile):
     if output != sys.stdout:
         output = open(output, 'w')
 
     writer = csv.writer(output)
-    reqs = parseConfigFile(config)
-    sess = Session()
+    config = loadconfig(configfile)
 
     for ci in range(0, cycles):
-        history = []
+        sess = Session()
+        history = {}
+        ri = 0
 
-        for cycle in reqs:
+        for req in config:
             starttime = millisec()
-            res = runRequest(cycle, sess, history)
-            history += res
+            res = runRequest(req, sess, history)
             endtime = millisec() - starttime
             writer.writerow([ci,
-                             cycle['url'],
+                             req['url'],
                              res.status_code,
                              endtime])
+
+            history[str(ri)] = res
+            ri += 1
+
+            if 'name' in req:
+                history[req['name']] = res
 
 
 if __name__ == '__main__':
