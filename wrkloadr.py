@@ -18,7 +18,8 @@ def loadconfig(file):
     config = json.loads(file.read(), 'utf-8')
     defaults = {'method': 'GET',
                 'headers': None,
-                'body': None}
+                'body': None,
+                'repeat': 1}
 
     for req in config:
         for key, val in defaults.items():
@@ -103,19 +104,22 @@ def run(cycles, output, configfile):
         ri = 0
 
         for req in config:
-            starttime = millisec()
-            res = runRequest(req, sess, history)
-            endtime = millisec() - starttime
-            writer.writerow([ci,
-                             req['url'],
-                             res.status_code,
-                             endtime])
+            for rri in range(0, int(req['repeat'])):
+                starttime = millisec()
+                res = runRequest(req, sess, history)
+                endtime = millisec()
+                writer.writerow([ci,
+                                 ri,
+                                 rri,
+                                 res.status_code,
+                                 starttime,
+                                 endtime])
 
-            history[str(ri)] = res
-            ri += 1
+                history[str(ri)] = res
+                ri += 1
 
-            if 'name' in req:
-                history[req['name']] = res
+                if 'name' in req:
+                    history[req['name']] = res
 
 
 if __name__ == '__main__':
