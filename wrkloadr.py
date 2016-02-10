@@ -5,6 +5,7 @@ import csv
 import json
 import sys
 
+from multiprocessing import Process
 from requests import Request, Session
 from re import finditer
 from time import time
@@ -23,7 +24,7 @@ def loadconfig(file):
 
     for req in config:
         for key, val in defaults.items():
-            if not key in req:
+            if key not in req:
                 req[key] = val
 
     return config
@@ -36,8 +37,8 @@ def parseconfig(data, history):
                 prop = history[match.group(1)]
                 keys = match.group(2).split('.')
 
-                if keys[0] == 'body':
-                    prop = prop.body
+                if keys[0] == 'json':
+                    prop = prop.json()
                 if keys[0] == 'headers':
                     prop = prop.headers
                 else:
@@ -51,7 +52,7 @@ def parseconfig(data, history):
                     prop = None
                     break
 
-                if prop != None:
+                if prop is not None:
                     data = data.replace(match.group(0), prop)
 
         return data
@@ -67,7 +68,7 @@ def parseconfig(data, history):
     return data
 
 
-def runRequest(config, sess, history):
+def send(config, sess, history):
     config = parseconfig(config, history)
     req = Request(config['method'],
                   config['url'],
@@ -75,38 +76,26 @@ def runRequest(config, sess, history):
                   data=json.dumps(config['body']))
 
     try:
-        res = sess.send(sess.prepare_request(req))
-        contenttype = res.headers['content-type']
-
-        if contenttype[:16] == 'application/json':
-            res.body = res.json()
-
-        return res
+        return sess.send(sess.prepare_request(req))
     except ConnectionError as e:
         return {'error': 'Connection Error'}
 
 
-
-@click.command()
-@click.option('-c', '--cycles', default=1)
-@click.option('-o', '--output', default=sys.stdout)
-@click.argument('configfile', type=click.File('r'), default=sys.stdin)
-def run(cycles, output, configfile):
+def singlerepeater(repeat, output, config):
     if output != sys.stdout:
-        output = open(output, 'w')
+        output = open(output, 'a')
 
     writer = csv.writer(output)
-    config = loadconfig(configfile)
 
-    for ci in range(0, cycles):
+    for ci in range(0, repeat):
         sess = Session()
         history = {}
         ri = 0
 
         for req in config:
-            for rri in range(0, int(req['repeat'])):
+            for rri in range(int(req['repeat'])):
                 starttime = millisec()
-                res = runRequest(req, sess, history)
+                res = send(req, sess, history)
                 endtime = millisec()
                 writer.writerow([ci,
                                  ri,
@@ -122,5 +111,22 @@ def run(cycles, output, configfile):
                     history[req['name']] = res
 
 
+@click.command()
+@click.option('-c', '--concurrency', type=int, default=1)
+@click.option('-r', '--repeat', type=int, default=1)
+@click.option('-o', '--output', type=str, default=sys.stdout)
+@click.argument('configfile', type=click.File('r'), default=sys.stdin)
+def multirepeater(concurrency, repeat, output, configfile):
+    config = loadconfig(configfile)
+    processes = [Process(target=singlerepeater,
+                         args=(repeat, output, config))
+                 for x in range(concurrency)]
+
+    for p in processes:
+        p.start()
+
+    for p in processes:
+        p.join()
+
 if __name__ == '__main__':
-    run()
+    multirepeater()
