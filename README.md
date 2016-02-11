@@ -1,30 +1,33 @@
 loadr
 =====
 
-loadr
--------
+A work in progress.
 
-* Takes arguments:
-	- AWS profile
-	- Concurrency
-	- Number of cycles
-	- `wrkloadr` setup/cycle file
-* Wraps
-	- `ec2-clusterizer` with machines * (concurrency / cpu)
-	- `wrkloadr` with setup/cycle file and loaded into `ec2-clusterizer`
+The aim is to create a simple but powerfull super-load-tester with support for
+complex series of requests and true concurrency from several instances.
 
-ec2-clusterizer
----------------
-
-* Initializes x ec2 machines
-* Uploads & runs specified code in some wrapped mode
-* Runs one process for each cpu or by other specification
-* Takes all `stdout` from each ec2-node process and sends it back home
-* Merges all gathered `stdout` to a single stream
-
-wrkloadr
+loadr.py
 --------
 
+* Wraps
+	- `clustrloadr.py` with instances/machines
+	- `wrkloadr.py` with setup/cycle file and wrapped within `clustrloadr.py`
+* Gathers all `csv` and merge it into something readable
+	- `ncurses`-based ui
+	- `json`-batches for a web ui
+	- ...
+
+clustrloadr.py
+--------------
+
+* Parses a provided environment config json file
+* Initializes instances at some provider
+* Uploads & runs specified code in some wrapped mode (`wrkloadr.py`)
+* Merges all gathered `stdout` to a single stream
+
+wrkloadr.py
+-----------
+
 * Parses setup/call-cycle file
-* Starts making http(s) requests defined by call-cycle
-* Output stats as `csv` to `stdout`
+* Starts making http(s) requests defined by call-cycle, concurrency and number of repeats
+* Output stats as `csv` to `stdout` or specified file
