@@ -5,6 +5,9 @@
 		"url": "http://host/create-session",
 		"body": {
 			"key": "sdlkfj"
+		},
+		"expect": {
+			"status": 200
 		}
 	},
 	{

@@ -115,9 +115,9 @@ def singlerepeater(repeat, output, config):
 @click.option('-c', '--concurrency', type=int, default=1)
 @click.option('-r', '--repeat', type=int, default=1)
 @click.option('-o', '--output', type=str, default=sys.stdout)
-@click.argument('configfile', type=click.File('r'), default=sys.stdin)
-def multirepeater(concurrency, repeat, output, configfile):
-    config = loadconfig(configfile)
+@click.argument('requestconfig', type=click.File('r'), default=sys.stdin)
+def multirepeater(concurrency, repeat, output, requestconfig):
+    config = loadconfig(requestconfig)
     processes = [Process(target=singlerepeater,
                          args=(repeat, output, config))
                  for x in range(concurrency)]
