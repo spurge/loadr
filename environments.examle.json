@@ -1,0 +1,18 @@
+{
+	"aws": {
+		"type": "awsec2",
+		"profile": "loadr",
+		"type": "t2.medium",
+		"image": "ami-xxxxxx",
+		"region": ""
+	},
+	"glesys": {
+		"type": "glesys",
+		"datacenter": "falkenberg",
+		"platform": "",
+		"hostname": "",
+		"templatename": "",
+		"cpucores": 4,
+		"bandwidth": 100
+	}
+}

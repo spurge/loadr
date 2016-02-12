@@ -1,0 +1,14 @@
+[
+	{
+		"environment": "aws",
+		"instances": 10,
+		"concurrency": 10,
+		"repeat": 1000
+	},
+	{
+		"environment": "glesys",
+		"instances": 20,
+		"concurrency": 10,
+		"repeat": 2000
+	}
+]

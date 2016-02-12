@@ -1,6 +1,0 @@
-{
-	"type": "aws-ec2",
-	"aws-profile": "loadr",
-	"ec2-type": "t2.medium",
-	"ec2-image": "ami-xxxxxx"
-}
