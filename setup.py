@@ -17,9 +17,21 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import providers
+from setuptools import setup
 
-def instanciator(instances, concurrency, repeat, output,
-                 environment, requests):
-    provider = providers.get_provider(environment)
-    provider.create_instances(instances)
+setup(
+    name='loadr',
+    version='0.1',
+    py_modules=['loadr'],
+    install_requires=[
+        'boto3',
+        'click',
+        'requests'
+    ],
+    entry_points='''
+        [console_scripts]
+        loadr=cli:main
+        wrkloadr=cli:worker
+        clustrloadr=cli:instances
+    ''',
+)

@@ -1,5 +1,3 @@
-#!/bin/env python3
-
 """
 Copyright (c) 2016 Olof Montin <olof@thebrewery.se>
 
@@ -19,15 +17,10 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import click
-import json
 import sys
 
 from clustrloadr import instanciator
-
-
-def loadconfig(file):
-    return json.loads(file.read(), 'utf-8')
+from wrkloadr import multirepeater
 
 
 def loadr(environments, requests, sessionconfig):
@@ -36,17 +29,3 @@ def loadr(environments, requests, sessionconfig):
     for s in sessions:
         instanciator(s['environment'], s['instances'], s['concurrency'],
                      s['repeat'], sys.stdout, environments, requests)
-
-
-@click.command()
-@click.option('-e', '--environments', type=click.File('r'),
-              help='Environments configuration file')
-@click.option('-q', '--requests', type=click.File('r'),
-              help='Requests configuration file')
-@click.argument('sessionconfig', type=click.File('r'), default=sys.stdin)
-def main(*args, **kwargs):
-    loadr(*args, **kwargs)
-
-
-if __name__ == '__main__':
-    main()

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """
 Copyright (c) 2016 Olof Montin <olof@thebrewery.se>
 
@@ -19,7 +17,6 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import click
 import csv
 import json
 import sys
@@ -34,8 +31,7 @@ def millisec():
     return int(round(time() * 1000))
 
 
-def loadconfig(file):
-    config = json.loads(file.read(), 'utf-8')
+def configdefaults(config):
     defaults = {'method': 'GET',
                 'headers': None,
                 'body': None,
@@ -130,13 +126,8 @@ def singlerepeater(repeat, output, config):
                     history[req['name']] = res
 
 
-@click.command()
-@click.option('-c', '--concurrency', type=int, default=1)
-@click.option('-r', '--repeat', type=int, default=1)
-@click.option('-o', '--output', type=str, default=sys.stdout)
-@click.argument('requestconfig', type=click.File('r'), default=sys.stdin)
 def multirepeater(concurrency, repeat, output, requestconfig):
-    config = loadconfig(requestconfig)
+    config = configdefaults(requestconfig)
     processes = [Process(target=singlerepeater,
                          args=(repeat, output, config))
                  for x in range(concurrency)]
@@ -147,5 +138,3 @@ def multirepeater(concurrency, repeat, output, requestconfig):
     for p in processes:
         p.join()
 
-if __name__ == '__main__':
-    multirepeater()
