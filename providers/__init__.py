@@ -18,10 +18,13 @@ along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from .awsec2 import Awsec2
+from .glesys import Glesys
 
 
 def get_provider(config):
     if config['type'] == 'awsec2':
         return Awsec2(config)
+    if config['type'] == 'glesys':
+        return Glesys(config)
 
     return None

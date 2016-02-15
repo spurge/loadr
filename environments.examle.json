@@ -8,11 +8,12 @@
 	},
 	"glesys": {
 		"type": "glesys",
+		"apiuser": "",
+		"apikey": "",
 		"datacenter": "falkenberg",
-		"platform": "",
-		"hostname": "",
-		"templatename": "",
-		"cpucores": 4,
+		"template": "",
+		"cpu": 4,
+		"memory": "1gb",
 		"bandwidth": 100
 	}
 }

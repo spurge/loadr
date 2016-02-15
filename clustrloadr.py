@@ -22,4 +22,10 @@ import providers
 def instanciator(instances, concurrency, repeat, output,
                  environment, requests):
     provider = providers.get_provider(environment)
-    provider.create_instances(instances)
+
+    if provider is not None:
+        provider.create_instances(instances)
+    elif 'type' not in environment:
+        raise Exception('Type of provider not defined')
+    else:
+        raise Exception('Unknown provider type: "%s"' % environment['type'])
