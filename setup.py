@@ -26,7 +26,8 @@ setup(
     install_requires=[
         'boto3',
         'click',
-        'requests'
+        'requests',
+        'gnupg'
     ],
     entry_points='''
         [console_scripts]

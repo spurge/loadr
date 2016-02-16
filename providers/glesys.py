@@ -24,7 +24,6 @@ class Glesys:
     apiurl = 'https://api.glesys.com/%s/%s'
     apimethod = 'POST'
 
-
     def __init__(self, config):
         self.config = config
 
@@ -44,13 +43,14 @@ class Glesys:
             hostname = self.generate_hostname()
             passwd = self.generate_passwd()
 
-            req = self.send('server', 'create', {'apiuser': self.gc('apiuser'),
-                                                 'apikey': self.gc('apikey'),
-                                                 'datacenter': self.gc('datacenter'),
-                                                 'platform': 'openvz',
-                                                 'hostname': hostname,
-                                                 'templatename': self.gc('template'),
-                                                 'disksize': '5gb',
-                                                 'cpucores': self.gc('cpu'),
-                                                 'memorysize': self.gc('memory'),
-                                                 'rootpassword': passwd})
+            req = self.send('server', 'create',
+                            {'apiuser': self.gc('apiuser'),
+                             'apikey': self.gc('apikey'),
+                             'datacenter': self.gc('datacenter'),
+                             'platform': 'openvz',
+                             'hostname': hostname,
+                             'templatename': self.gc('template'),
+                             'disksize': '5gb',
+                             'cpucores': self.gc('cpu'),
+                             'memorysize': self.gc('memory'),
+                             'rootpassword': passwd})
