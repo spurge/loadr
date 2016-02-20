@@ -21,23 +21,10 @@ import click
 import json
 import sys
 
-from gnupg import GPG
-
 from clustrloadr import instanciator
 from loadr import loadr
+from util import config
 from wrkloadr import multirepeater
-
-
-def loadconfig(file):
-    if file.name[len(file.name) - 4:] in ('.gpg', '.pgp'):
-        gpg = GPG()
-        gpg.encoding = 'utf-8'
-        data = gpg.decrypt_file(file.name)
-        click.echo(data)
-    else:
-        data = file.read()
-
-    return json.loads(data, 'utf-8')
 
 
 @click.command()
@@ -47,7 +34,7 @@ def loadconfig(file):
 @click.argument('requestfile', type=click.File('r'), default=sys.stdin)
 def worker(concurrency, repeat, output, requestfile):
     multirepeater(concurrency, repeat, output,
-                  loadconfig(requestfile))
+                  config.load(requestfile))
 
 
 @click.command()
@@ -65,8 +52,8 @@ def worker(concurrency, repeat, output, requestfile):
 def instances(provider, instances, concurrency, repeat,
               output, environments, requests):
     instanciator(instances, concurrency, repeat, output,
-                 loadconfig(environments)[provider],
-                 loadconfig(requests))
+                 config.load(environments)[provider],
+                 config.load(requests))
 
 
 @click.command()
@@ -76,5 +63,5 @@ def instances(provider, instances, concurrency, repeat,
               help='Requests configuration file')
 @click.argument('sessionfile', type=click.File('r'), default=sys.stdin)
 def main(environments, requests, sessionfile):
-    loadr(loadconfig(environments), loadconfig(requests),
-          loadconfig(sessionfile))
+    loadr(config.load(environments), config.load(requests),
+          config.load(sessionfile))

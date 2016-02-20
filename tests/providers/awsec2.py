@@ -17,23 +17,14 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from setuptools import setup
+from providers.awsec2 import Awsec2
+from util.providertest import ProviderTest
 
-setup(
-    name='loadr',
-    version='0.1',
-    py_modules=['loadr'],
-    install_requires=[
-        'boto3',
-        'click',
-        'gnupg',
-        'paramiko',
-        'requests'
-    ],
-    entry_points='''
-        [console_scripts]
-        loadr=cli:main
-        wrkloadr=cli:worker
-        clustrloadr=cli:instances
-    ''',
-)
+
+class TestAwsec2(ProviderTest):
+
+    def setUp(self):
+        self.provider = Awsec2({'profile': 'loadr',
+                                'type':    't2.micro',
+                                'image':   'ami-d22932be',
+                                'region':  'eu-central-1'})

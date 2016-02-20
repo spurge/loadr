@@ -1,4 +1,5 @@
 """
+
 Copyright (c) 2016 Olof Montin <olof@thebrewery.se>
 
 This file is part of loadr.
@@ -18,6 +19,9 @@ along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import boto3
+import sys
+
+from paramiko import SSHClient
 
 
 class Awsec2:
@@ -28,11 +32,42 @@ class Awsec2:
         python3 get-pip.py"""
 
     def __init__(self, config):
-        self.ec2 = boto3.resource('ec2')
+        self.session = boto3.session.Session(profile_name=config['profile'],
+                                             region_name=config['region'])
+        self.ec2 = self.session.resource('ec2')
+        self.config = config
+        self.keypair = self.create_keypair()
+        self.instances = []
 
-    def get_instances(self, count):
-        self.instances = ec2.create_instances(ImageId=config['ec2-image'],
-                                              InstanceType=config['ec2-type'],
-                                              MinCount=instances,
-                                              MaxCount=instances,
-                                              UserData=bootscript)
+    def create_keypair(self):
+        keypair = self.ec2.KeyPair('loadr')
+        keypair.delete()
+
+        return self.ec2.create_key_pair(KeyName='loadr')
+
+    def create_instances(self, instances):
+        self.instances = self.ec2.create_instances(
+                            ImageId=self.config['image'],
+                            InstanceType=self.config['type'],
+                            MinCount=instances,
+                            MaxCount=instances,
+                            UserData=self.bootscript,
+                            KeyName='loadr')
+        [i.wait_until_running() for i in self.instances]
+
+    def remove_instances(self):
+        [i.terminate() for i in self.instances]
+        self.keypair.delete()
+
+    def run_worker(self, requests):
+        for i in self.instances:
+            client = SSHClient()
+            client.connect(i.public_ip_address, pkey=self.keypair.key_material)
+            stdin, stdout, stderr = client.exec_command('ls -lh')
+            print(stdin)
+            print(stdout)
+            print(stderr)
+
+    def shutdown(self):
+        # self.ec2.meta.client.close()
+        pass

@@ -17,23 +17,18 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from setuptools import setup
+import unittest
 
-setup(
-    name='loadr',
-    version='0.1',
-    py_modules=['loadr'],
-    install_requires=[
-        'boto3',
-        'click',
-        'gnupg',
-        'paramiko',
-        'requests'
-    ],
-    entry_points='''
-        [console_scripts]
-        loadr=cli:main
-        wrkloadr=cli:worker
-        clustrloadr=cli:instances
-    ''',
-)
+
+class ProviderTest(unittest.TestCase):
+
+    def tearDown(self):
+        self.provider.shutdown()
+
+    def test_create_instance(self):
+        self.provider.create_instances(1)
+
+        self.provider.run_worker([{'method': 'get',
+                                   'url': 'https://google.com?q=loadr'}])
+
+        self.provider.remove_instances()
