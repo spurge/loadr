@@ -18,17 +18,30 @@ along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import unittest
+import sys
+
+from io import StringIO
 
 
 class ProviderTest(unittest.TestCase):
 
     def tearDown(self):
+        self.provider.remove_instances()
         self.provider.shutdown()
 
-    def test_create_instance(self):
-        self.provider.create_instances(1)
+    def test_create_instances(self):
+        self.assertIsNotNone(self.provider)
 
+        self.provider.create_instances(1)
+        self.assertEqual(len(self.provider.instances), 1)
+
+        output = StringIO()
         self.provider.run_worker([{'method': 'get',
-                                   'url': 'https://google.com?q=loadr'}])
+                                   'url': 'https://google.com?q=loadr'}],
+                                 output)
+
+        self.assertGreater(len(output.getvalue()), 0)
+        output.close()
 
         self.provider.remove_instances()
+        self.assertIsNone(self.provider.instances)
