@@ -1,5 +1,4 @@
 """
-
 Copyright (c) 2016 Olof Montin <olof@thebrewery.se>
 
 This file is part of loadr.
@@ -19,10 +18,12 @@ along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import boto3
+import json
 import paramiko
 import sys
 
 from io import StringIO
+from multiprocessing import Process
 from time import sleep
 
 
@@ -69,14 +70,13 @@ class Awsec2:
 
         return sg
 
-
     def create_instances(self, instances):
         self.instances = self.ec2.create_instances(
                             ImageId=self.config['image'],
                             InstanceType=self.config['type'],
                             MinCount=instances,
                             MaxCount=instances,
-                            UserData=self.bootscript,
+                            # UserData=self.bootscript,
                             KeyName=self.keypair.name,
                             SecurityGroupIds=[self.securitygroup.id])
         [i.wait_until_running() for i in self.instances]
@@ -88,35 +88,63 @@ class Awsec2:
             [i.wait_until_terminated() for i in self.instances]
             self.instances = None
 
-    def run_worker(self, requests, writer):
-        for i in self.instances:
-            client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    def run_instance_worker(self, concurrency, repeat, requests, writer):
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-            keyfile = StringIO(self.keypair.key_material)
-            key = paramiko.RSAKey.from_private_key(keyfile)
+        keyfile = StringIO(self.keypair.key_material)
+        key = paramiko.RSAKey.from_private_key(keyfile)
 
-            for x in range(3):
-                try:
-                    client.connect(i.public_dns_name,
-                                   username='ec2-user',
-                                   pkey=key,
-                                   look_for_keys=False,
-                                   timeout=60)
-                    stdin, stdout, stderr = client.exec_command('ls -lah')
+        # Retry loop
+        for x in range(3):
+            try:
+                client.connect(i.public_dns_name,
+                               username='ec2-user',
+                               pkey=key,
+                               look_for_keys=False,
+                               timeout=60)
 
-                    for l in stdout:
-                        writer.write(l)
+                # Upload wrkloadr
+                sftp = client.open_sftp()
+                sftp.put('wrkloadr.py')
 
-                    stdin.close()
-                    stdout.close()
-                    stderr.close()
-                    break
-                except:
-                    sleep(60)
+                # Then execute
+                channel = client.get_transport().open_session()
+                channel.exec_command('python3 wrkloadr.py %d %d \'%s\'' % (
+                                        concurrency,
+                                        repeat,
+                                        json.dumps(requests)))
 
-            client.close()
-            keyfile.close()
+                stderr = channel.recv_stderr(1024)
+                stdout = channel.recv(1024)
+
+                while stderr is not None or stdout is not None:
+                    stderr = channel.recv_stderr(1024)
+                    stdout = channel.recv(1024)
+                    writer.write(stdout)
+                    print(stderr)
+                    print(stdout)
+
+                channel.close()
+                break
+            except:
+                sleep(60)
+            finally:
+                if client is not None:
+                    client.close()
+
+        keyfile.close()
+
+    def run_workers(self, concurrency, repeat, requests, writer):
+        processes = [Process(target=self.run_instance_worker,
+                             args=(concurrency, repeat, requests, writer))
+                     for i in self.instances]
+
+        for p in processes:
+            p.start()
+
+        for p in processes:
+            p.join()
 
     def shutdown(self):
         if self.keypair is not None:

@@ -138,3 +138,16 @@ def multirepeater(concurrency, repeat, output, requestconfig):
     for p in processes:
         p.join()
 
+
+if __name__ == '__main__':
+    import json
+
+    if len(sys.argv) < 4:
+        print('Too few arguments. 3 required: concurrency, repeat and requests.',
+              file=sys.stderr)
+        sys.exit(2)
+
+    multirepeater(int(sys.argv[1]),
+                  int(sys.argv[2]),
+                  sys.stdout,
+                  json.loads(sys.argv[3]))
