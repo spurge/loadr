@@ -88,56 +88,46 @@ class Awsec2:
             [i.wait_until_terminated() for i in self.instances]
             self.instances = None
 
-    def run_instance_worker(self, concurrency, repeat, requests, writer):
+    def run_instance_worker(self, instance, concurrency,
+                            repeat, requests, writer):
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         keyfile = StringIO(self.keypair.key_material)
         key = paramiko.RSAKey.from_private_key(keyfile)
 
-        # Retry loop
-        for x in range(3):
-            try:
-                client.connect(i.public_dns_name,
-                               username='ec2-user',
-                               pkey=key,
-                               look_for_keys=False,
-                               timeout=60)
+        sleep(60)
 
-                # Upload wrkloadr
-                sftp = client.open_sftp()
-                sftp.put('wrkloadr.py')
+        client.connect(instance.public_dns_name,
+                       username='ec2-user',
+                       pkey=key,
+                       look_for_keys=False,
+                       timeout=60)
 
-                # Then execute
-                channel = client.get_transport().open_session()
-                channel.exec_command('python3 wrkloadr.py %d %d \'%s\'' % (
-                                        concurrency,
-                                        repeat,
-                                        json.dumps(requests)))
+        # Upload wrkloadr
+        sftp = client.open_sftp()
+        sftp.put('wrkloadr.py', 'wrkloadr.py')
 
-                stderr = channel.recv_stderr(1024)
-                stdout = channel.recv(1024)
+        # Then execute
+        channel = client.get_transport().open_session()
+        channel.exec_command('python3 wrkloadr.py {} {} \'{}\''.format(
+                                concurrency,
+                                repeat,
+                                json.dumps(requests)))
 
-                while stderr is not None or stdout is not None:
-                    stderr = channel.recv_stderr(1024)
-                    stdout = channel.recv(1024)
-                    writer.write(stdout)
-                    print(stderr)
-                    print(stdout)
+        stdout = channel.recv(1024)
 
-                channel.close()
-                break
-            except:
-                sleep(60)
-            finally:
-                if client is not None:
-                    client.close()
+        while stdout is not None:
+            writer.write(stdout.decode('utf-8'))
+            stdout = channel.recv(1024)
 
+        channel.close()
+        client.close()
         keyfile.close()
 
     def run_workers(self, concurrency, repeat, requests, writer):
         processes = [Process(target=self.run_instance_worker,
-                             args=(concurrency, repeat, requests, writer))
+                             args=(i, concurrency, repeat, requests, writer))
                      for i in self.instances]
 
         for p in processes:
