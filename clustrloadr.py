@@ -17,15 +17,41 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from multiprocessing import Process
+
 import providers
+
 
 def instanciator(instances, concurrency, repeat, output,
                  environment, requests):
+    """Creates a provider specified in the environment and makes it create
+    instances. Then run workers on all instances and write all ouput to
+    specified output writer.
+    """
+
     provider = providers.get_provider(environment)
 
     if provider is not None:
         provider.create_instances(instances)
+        provider.run_multiple_workers(concurrency, repeat, requests, output)
+        provider.remove_instances()
+        provider.shutdown()
     elif 'type' not in environment:
-        raise Exception('Type of provider not defined')
+        raise ValueError('Type of provider not defined')
     else:
-        raise Exception('Unknown provider type: "%s"' % environment['type'])
+        raise ValueError('Unknown provider type: "%s"' % environment['type'])
+
+
+def sessionizer(session, requests, output):
+    """Runs multple instanciators defined by session.
+    """
+
+    processes = [Process(target=instanciator,
+                         args={'requests':requests, 'output':output, **session})
+                 for s in session]
+
+    for p in processes:
+        p.start()
+
+    for p in processes:
+        p.join()

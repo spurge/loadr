@@ -24,7 +24,7 @@ from util.providertest import ProviderTest
 class TestAwsec2(ProviderTest):
 
     def setUp(self):
-        self.provider = Awsec2({'profile': 'loadr',
-                                'type':    't2.micro',
-                                'image':   'ami-d22932be',
-                                'region':  'eu-central-1'})
+        self.provider = Awsec2(profile='loadr',
+                               instance_type='t2.micro',
+                               image_id='ami-d22932be',
+                               region='eu-central-1')

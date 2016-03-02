@@ -36,10 +36,11 @@ class ProviderTest(unittest.TestCase):
         self.assertEqual(len(self.provider.instances), 1)
 
         output = StringIO()
-        self.provider.run_workers([{'method': 'get',
-                                   'url': 'https://google.com?q=loadr'}],
-                                   1, 1, output)
+        self.provider.run_multiple_workers([{'method': 'get',
+                                             'url': 'https://google.com?q=loadr'}],
+                                           1, 1, output)
 
+        output.seek(0)
         self.assertGreater(len(output.getvalue()), 0)
         output.close()
 

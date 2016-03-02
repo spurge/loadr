@@ -23,8 +23,8 @@ from .glesys import Glesys
 
 def get_provider(config):
     if config['type'] == 'awsec2':
-        return Awsec2(config)
+        return Awsec2(**config)
     if config['type'] == 'glesys':
-        return Glesys(config)
+        return Glesys(**config)
 
     return None
