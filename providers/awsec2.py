@@ -23,7 +23,7 @@ import paramiko
 import sys
 
 from io import StringIO
-from multiprocessing import Process
+from multiprocessing import Process, Queue, current_process
 from time import sleep
 
 
@@ -35,7 +35,10 @@ class Awsec2:
     The nested instances-stuff is not implemented yet.
     """
 
-    def __init__(self, image_id, instance_type, **kwargs):
+    def __init__(self, output, image_id, instance_type, **kwargs):
+        # All output in a single queue
+        self.output = output
+
         # Save these for later -> create_instances
         self.image_id, self.instance_type = image_id, instance_type
 
@@ -102,6 +105,8 @@ class Awsec2:
         Instance type and image where defined in the class __init__.
         """
 
+        self.output.put(('status', '', 'creating instances'))
+
         self.instances = self.ec2.create_instances(
                             ImageId=self.image_id,
                             InstanceType=self.instance_type,
@@ -114,6 +119,7 @@ class Awsec2:
         for i in self.instances:
             i.wait_until_running()
             i.load()
+            self.output.put(('status', i.id, 'running'))
 
     def remove_instances(self):
         """Terminates all instances.
@@ -122,16 +128,19 @@ class Awsec2:
         for i in self.instances:
             i.terminate()
             i.wait_until_terminated()
+            self.output.put(('status', i.id, 'terminated'))
 
         self.instances = []
 
     def run_single_worker(self, instance, concurrency,
-                          repeat, requests, writer):
+                          repeat, requests):
         """Creates a ssh connection to specified instance,
         uploads wrkloadr.py and runs it. It will the write all stdout to
         specified writer.
         Used by the run_multiple_workers method.
         """
+
+        self.output.put(('status', instance.id, 'connecting'))
 
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -153,6 +162,7 @@ class Awsec2:
                                pkey=key,
                                look_for_keys=False,
                                timeout=60)
+                self.output.put(('status', instance.id, 'connected'))
                 break
             except:
                 if r == retries - 1:
@@ -164,39 +174,49 @@ class Awsec2:
 
         # Then execute
         channel = client.get_transport().open_session()
-        channel.exec_command('python3 wrkloadr.py {} {} \'{}\''.format(
+        channel.exec_command('python wrkloadr.py {} {} \'{}\''.format(
                                 concurrency,
                                 repeat,
                                 json.dumps(requests)))
+        self.output.put(('status', instance.id, 'running command'))
 
         # Write all stdout from ssh channel to specified writer
-        while not channel.exit_status_ready():
-            stdout = channel.recv(1024)
-            stdout_str = stdout.decode('utf-8').strip()
+        while True:
+            stdout = channel.recv(1024).decode('utf-8')
+            stderr = channel.recv_stderr(1024).decode('utf-8')
 
-            if len(stdout_str) > 0:
-                sys.stdout.write(stdout_str)
+            if len(stdout) <= 0 and len(stderr) <= 0:
+                break;
 
-            writer.write(stdout_str)
+            if len(stdout) > 0:
+                self.output.put(('data', instance.id, stdout))
+
+            if len(stderr) > 0:
+                self.output.put(('error', instance.id, stderr))
+
+        self.output.put(('status', instance.id, 'ended'))
 
         # Close and quit
         channel.close()
         client.close()
         keyfile.close()
 
-    def run_multiple_workers(self, concurrency, repeat, requests, writer):
+    def run_multiple_workers(self, concurrency, repeat, requests):
         """Runs multiple workers on each instance.
         Each worker within its own thread.
         Used run_single_worker method.
         """
 
+        # Initialize the instance processes
         processes = [Process(target=self.run_single_worker,
-                             args=(i, concurrency, repeat, requests, writer))
+                             args=(i, concurrency, repeat, requests))
                      for i in self.instances]
 
+        # Start processes
         for p in processes:
             p.start()
 
+        # Then wait for all processes to end
         for p in processes:
             p.join()
 

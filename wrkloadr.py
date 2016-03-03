@@ -22,7 +22,7 @@ import json
 import sys
 
 from multiprocessing import Process
-from requests import Request, Session
+from requests import Request, Session, ConnectionError
 from re import finditer
 from time import time
 
@@ -90,10 +90,7 @@ def send(config, sess, history):
                   headers=config['headers'],
                   data=json.dumps(config['body']))
 
-    try:
-        return sess.send(sess.prepare_request(req))
-    except ConnectionError as e:
-        return {'error': 'Connection Error'}
+    return sess.send(sess.prepare_request(req))
 
 
 def singlerepeater(repeat, output, config):
@@ -110,16 +107,23 @@ def singlerepeater(repeat, output, config):
         for req in config:
             for rri in range(int(req['repeat'])):
                 starttime = millisec()
-                res = send(req, sess, history)
+
+                try:
+                    res = send(req, sess, history)
+                    history[str(ri)] = res
+                    status = res.status_code
+                except ConnectionError as e:
+                    status = 'connection-error'
+
                 endtime = millisec()
+
                 writer.writerow([ci,
                                  ri,
                                  rri,
-                                 res.status_code,
+                                 status,
                                  starttime,
                                  endtime])
 
-                history[str(ri)] = res
                 ri += 1
 
                 if 'name' in req:
@@ -143,8 +147,7 @@ if __name__ == '__main__':
     import json
 
     if len(sys.argv) < 4:
-        print('Too few arguments. 3 required: concurrency, repeat and requests.',
-              file=sys.stderr)
+        sys.stderr.write('Too few arguments. 3 required: concurrency, repeat and requests.')
         sys.exit(2)
 
     multirepeater(int(sys.argv[1]),

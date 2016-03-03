@@ -21,9 +21,13 @@ import unittest
 import sys
 
 from io import StringIO
+from multiprocessing import Process, Queue
 
 
 class ProviderTest(unittest.TestCase):
+
+    def setUp(self):
+        self.output = Queue()
 
     def tearDown(self):
         self.provider.remove_instances()
@@ -35,14 +39,30 @@ class ProviderTest(unittest.TestCase):
         self.provider.create_instances(1)
         self.assertEqual(len(self.provider.instances), 1)
 
-        output = StringIO()
-        self.provider.run_multiple_workers([{'method': 'get',
-                                             'url': 'https://google.com?q=loadr'}],
-                                           1, 1, output)
+        self.provider.run_multiple_workers(concurrency=1,
+                                           repeat=1,
+                                           requests=[{'method': 'get',
+                                                      'url': 'https://google.com?q=loadr'}])
 
-        output.seek(0)
-        self.assertGreater(len(output.getvalue()), 0)
-        output.close()
+        stdout = ''
+        stderr = ''
+
+        while True:
+            data = self.output.get(True, 60)
+
+            if data[0] == 'data':
+                sys.stdout.write(data[2])
+                stdout += data[2]
+
+            if data[0] == 'error':
+                sys.stderr.write(data[2])
+                stderr += data[2]
+
+            if data[0] == 'status' and data[2] == 'ended':
+                break
+
+        self.assertGreater(len(stdout), 0)
+        self.assertGreater(1, len(stderr))
 
         self.provider.remove_instances()
-        self.assertIsNone(self.provider.instances)
+        self.assertGreater(1, len(self.provider.instances))
