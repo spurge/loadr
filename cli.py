@@ -21,10 +21,36 @@ import click
 import json
 import sys
 
+from multiprocessing import Process, Queue
+
 from clustrloadr import instanciator
 from loadr import loadr
 from util import config
 from wrkloadr import multirepeater
+
+
+def logger(output):
+    while True:
+        data = output.get(True)
+
+        if data[0] == 'data':
+            sys.stdout.write(data[2])
+
+        if data[0] == 'error':
+            sys.stderr.write(data[2])
+
+
+def wrapper(func, kwargs):
+    output = Queue()
+
+    log = Process(target=logger, args=(output))
+    stuff = Process(target=func, args={**kwargs, 'output': output})
+
+    log.start()
+    stuff.start()
+
+    stuff.join()
+    log.join()
 
 
 @click.command()
@@ -49,7 +75,7 @@ def worker(concurrency, repeat, output, requestfile):
               help='Environments configuration file')
 @click.option('-q', '--requests', type=click.File('r'),
               help='Requests configuration file')
-def instances(provider, instances, concurrency, repeat,
+def cluster(provider, instances, concurrency, repeat,
               output, environments, requests):
     instanciator(instances, concurrency, repeat, output,
                  config.load(environments)[provider],

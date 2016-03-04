@@ -33,7 +33,8 @@ setup(
     entry_points='''
         [console_scripts]
         loadr=cli:main
-        wrkloadr=cli:worker
-        clustrloadr=cli:instances
+        loadr:worker=cli:worker
+        loadr:cluster=cli:cluster
+        loadr:session=cli:session
     ''',
 )
