@@ -35,6 +35,16 @@ class Awsec2:
     The nested instances-stuff is not implemented yet.
     """
 
+    bootscript = """#!/bin/bash
+yum update -y
+yum install -y python34 python34-pip
+alternatives --set python /usr/bin/python3.4
+pip install requests
+"""
+    """Lines of bash that will run when the instances initializes
+    """
+
+
     def __init__(self, output, image_id, instance_type, **kwargs):
         # All output in a single queue
         self.output = output
@@ -112,6 +122,7 @@ class Awsec2:
                             InstanceType=self.instance_type,
                             MinCount=instances,
                             MaxCount=instances,
+                            UserData=self.bootscript,
                             KeyName=self.keypair.name,
                             SecurityGroupIds=[self.securitygroup.id])
 
@@ -182,17 +193,19 @@ class Awsec2:
 
         # Write all stdout from ssh channel to specified writer
         while True:
-            stdout = channel.recv(1024).decode('utf-8')
-            stderr = channel.recv_stderr(1024).decode('utf-8')
+            stdout = channel.recv(1024)
+            stderr = channel.recv_stderr(1024)
 
-            if len(stdout) <= 0 and len(stderr) <= 0:
+            if not stdout and not stderr:
                 break;
 
             if len(stdout) > 0:
-                self.output.put(('data', instance.id, stdout))
+                self.output.put(('data', instance.id,
+                                 stdout.decode('utf-8')))
 
             if len(stderr) > 0:
-                self.output.put(('error', instance.id, stderr))
+                self.output.put(('error', instance.id,
+                                 stderr.decode('utf-8')))
 
         self.output.put(('status', instance.id, 'ended'))
 

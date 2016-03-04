@@ -48,7 +48,7 @@ class ProviderTest(unittest.TestCase):
         stderr = ''
 
         while True:
-            data = self.output.get(True, 60)
+            data = self.output.get(True, 120)
 
             if data[0] == 'data':
                 sys.stdout.write(data[2])
