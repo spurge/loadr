@@ -199,6 +199,8 @@ pip install requests
             if not stdout and not stderr:
                 break;
 
+            # Todo: separate output.put by line-endings
+
             if len(stdout) > 0:
                 self.output.put(('data', instance.id,
                                  stdout.decode('utf-8')))

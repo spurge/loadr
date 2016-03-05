@@ -23,11 +23,14 @@ import sys
 from io import StringIO
 from multiprocessing import Process, Queue
 
+from providers import Localhost
 
-class ProviderTest(unittest.TestCase):
+
+class TestLocalhost(unittest.TestCase):
 
     def setUp(self):
         self.output = Queue()
+        sels.provider = Localhost(output=self.output)
 
     def tearDown(self):
         self.provider.remove_instances()

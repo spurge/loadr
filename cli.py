@@ -31,7 +31,7 @@ from wrkloadr import multirepeater
 
 def logger(output):
     while True:
-        data = output.get(True)
+        data = output.get(True, 120)
 
         if data[0] == 'data':
             sys.stdout.write(data[2])

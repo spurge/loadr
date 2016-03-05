@@ -21,7 +21,7 @@ import csv
 import json
 import sys
 
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 from requests import Request, Session, ConnectionError
 from re import finditer
 from time import time
@@ -93,12 +93,7 @@ def send(config, sess, history):
     return sess.send(sess.prepare_request(req))
 
 
-def singlerepeater(repeat, output, config):
-    if output != sys.stdout:
-        output = open(output, 'a')
-
-    writer = csv.writer(output)
-
+def singlerepeater(repeat, writer, config):
     for ci in range(0, repeat):
         sess = Session()
         history = {}
@@ -117,12 +112,12 @@ def singlerepeater(repeat, output, config):
 
                 endtime = millisec()
 
-                writer.writerow([ci,
-                                 ri,
-                                 rri,
-                                 status,
-                                 starttime,
-                                 endtime])
+                writer([ci,
+                        ri,
+                        rri,
+                        status,
+                        starttime,
+                        endtime])
 
                 ri += 1
 
@@ -130,10 +125,10 @@ def singlerepeater(repeat, output, config):
                     history[req['name']] = res
 
 
-def multirepeater(concurrency, repeat, output, requestconfig):
+def multirepeater(concurrency, repeat, writer, requestconfig):
     config = configdefaults(requestconfig)
     processes = [Process(target=singlerepeater,
-                         args=(repeat, output, config))
+                         args=(repeat, writer, config))
                  for x in range(concurrency)]
 
     for p in processes:
@@ -150,7 +145,9 @@ if __name__ == '__main__':
         sys.stderr.write('Too few arguments. 3 required: concurrency, repeat and requests.')
         sys.exit(2)
 
+    writer = csv.writer(sys.stdout).writerow
+
     multirepeater(int(sys.argv[1]),
                   int(sys.argv[2]),
-                  sys.stdout,
+                  writer,
                   json.loads(sys.argv[3]))

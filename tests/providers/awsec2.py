@@ -18,10 +18,10 @@ along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from providers.awsec2 import Awsec2
-from util.providertest import ProviderTest
+from tests.providers import TestLocalhost
 
 
-class TestAwsec2(ProviderTest):
+class TestAwsec2(TestLocalhost):
 
     def setUp(self):
         super().setUp()

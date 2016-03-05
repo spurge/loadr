@@ -6,6 +6,22 @@ A work in progress.
 The aim is to create a simple but powerfull super-load-tester with support for
 complex series of requests and true concurrency from several instances.
 
+TODO
+----
+
+* Localhost-provider which also works as a superclass for other providers and
+  provder tests.
+* Separate fetched data from remote instances in awsec2.
+* Rewrite `clustrloadr.py` to first initiate all providers with instances and
+  then launch all workers at the same time.
+* Write tests for `clustrloadr.py` and `workrloadr.py`.
+* UIs: csv, ncurses and json.
+* Rewrite `cli.py` with three threads:
+	- Main-thread which parses config files and launches the two other threads.
+	- UI-thread which has a `Pipe` and a `Queue` connected to the
+	  Cluster-thread.
+	- Cluster-thread which uses `clustrloadr.py` to launch instances.
+
 loadr.py
 --------
 
