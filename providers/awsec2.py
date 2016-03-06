@@ -191,6 +191,9 @@ pip install requests
                                 json.dumps(requests)))
         self.output.put(('status', instance.id, 'running command'))
 
+        # We're separating csv data form instances by \n.
+        # Therefor we can't be sure about the last line being complete.
+        # Save last line of csv data and prepend it next batch of lines.
         lastline = ''
 
         # Write all stdout from ssh channel to specified writer
@@ -201,9 +204,11 @@ pip install requests
             if not stdout and not stderr:
                 break;
 
-            # Todo: separate output.put by line-endings
-
             if len(stdout) > 0:
+                # Unfinished line parsing.
+                # The last line can end with an \n or in the middle of
+                # of the line.
+
                 lines = stdout.decode('utf-8').split('\n')
 
                 for csv in [lastline] + lines[:-1]:
