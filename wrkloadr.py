@@ -17,7 +17,6 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import csv
 import json
 import sys
 
@@ -83,6 +82,13 @@ def parseconfig(data, history):
     return data
 
 
+def csvwriter(output, *xtra):
+    def writer(*data):
+        output(','.join([str(v) for v in data + xtra]) + '\n')
+
+    return writer
+
+
 def send(config, sess, history):
     config = parseconfig(config, history)
     req = Request(config['method'],
@@ -112,12 +118,12 @@ def singlerepeater(repeat, writer, config):
 
                 endtime = millisec()
 
-                writer([ci,
-                        ri,
-                        rri,
-                        status,
-                        starttime,
-                        endtime])
+                writer(ci,
+                       ri,
+                       rri,
+                       status,
+                       starttime,
+                       endtime)
 
                 ri += 1
 
@@ -145,7 +151,7 @@ if __name__ == '__main__':
         sys.stderr.write('Too few arguments. 3 required: concurrency, repeat and requests.')
         sys.exit(2)
 
-    writer = csv.writer(sys.stdout).writerow
+    writer = csvwriter(sys.stdout.write)
 
     multirepeater(int(sys.argv[1]),
                   int(sys.argv[2]),

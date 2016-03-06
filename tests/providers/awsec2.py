@@ -18,7 +18,7 @@ along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from providers.awsec2 import Awsec2
-from tests.providers import TestLocalhost
+from tests.providers.localhost import TestLocalhost
 
 
 class TestAwsec2(TestLocalhost):

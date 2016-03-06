@@ -9,9 +9,6 @@ complex series of requests and true concurrency from several instances.
 TODO
 ----
 
-* Localhost-provider which also works as a superclass for other providers and
-  provder tests.
-* Separate fetched data from remote instances in awsec2.
 * Rewrite `clustrloadr.py` to first initiate all providers with instances and
   then launch all workers at the same time.
 * Write tests for `clustrloadr.py` and `workrloadr.py`.

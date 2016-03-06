@@ -23,7 +23,7 @@ import paramiko
 import sys
 
 from io import StringIO
-from multiprocessing import Process, Queue, current_process
+from multiprocessing import Process, Queue
 from time import sleep
 
 
@@ -115,7 +115,7 @@ pip install requests
         Instance type and image where defined in the class __init__.
         """
 
-        self.output.put(('status', '', 'creating instances'))
+        self.output.put(('status', 'awsec2', 'creating instances'))
 
         self.instances = self.ec2.create_instances(
                             ImageId=self.image_id,
@@ -191,6 +191,8 @@ pip install requests
                                 json.dumps(requests)))
         self.output.put(('status', instance.id, 'running command'))
 
+        lastline = ''
+
         # Write all stdout from ssh channel to specified writer
         while True:
             stdout = channel.recv(1024)
@@ -202,12 +204,22 @@ pip install requests
             # Todo: separate output.put by line-endings
 
             if len(stdout) > 0:
-                self.output.put(('data', instance.id,
-                                 stdout.decode('utf-8')))
+                lines = stdout.decode('utf-8').split('\n')
+
+                for csv in [lastline] + lines[:-1]:
+                    if len(csv) > 0:
+                        self.output.put(('data',
+                                         instance.id,
+                                         csv))
+
+                lastline = lines[-1]
 
             if len(stderr) > 0:
                 self.output.put(('error', instance.id,
                                  stderr.decode('utf-8')))
+
+        if len(lastline) > 0:
+            self.output.put(('data', instance.id, lastline))
 
         self.output.put(('status', instance.id, 'ended'))
 

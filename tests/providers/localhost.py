@@ -23,14 +23,14 @@ import sys
 from io import StringIO
 from multiprocessing import Process, Queue
 
-from providers import Localhost
+from providers.localhost import Localhost
 
 
 class TestLocalhost(unittest.TestCase):
 
     def setUp(self):
         self.output = Queue()
-        sels.provider = Localhost(output=self.output)
+        self.provider = Localhost(output=self.output)
 
     def tearDown(self):
         self.provider.remove_instances()
@@ -42,20 +42,19 @@ class TestLocalhost(unittest.TestCase):
         self.provider.create_instances(1)
         self.assertEqual(len(self.provider.instances), 1)
 
-        self.provider.run_multiple_workers(concurrency=1,
-                                           repeat=1,
+        self.provider.run_multiple_workers(concurrency=2,
+                                           repeat=3,
                                            requests=[{'method': 'get',
                                                       'url': 'https://google.com?q=loadr'}])
 
-        stdout = ''
+        stdout = []
         stderr = ''
 
         while True:
             data = self.output.get(True, 120)
 
             if data[0] == 'data':
-                sys.stdout.write(data[2])
-                stdout += data[2]
+                stdout.append(data)
 
             if data[0] == 'error':
                 sys.stderr.write(data[2])
@@ -64,8 +63,8 @@ class TestLocalhost(unittest.TestCase):
             if data[0] == 'status' and data[2] == 'ended':
                 break
 
-        self.assertGreater(len(stdout), 0)
-        self.assertGreater(1, len(stderr))
+        self.assertEqual(len(stdout), 6)
+        self.assertEqual(len(stderr), 0)
 
         self.provider.remove_instances()
-        self.assertGreater(1, len(self.provider.instances))
+        self.assertEqual(len(self.provider.instances), 0)
