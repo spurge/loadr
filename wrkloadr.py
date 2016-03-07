@@ -53,10 +53,10 @@ def parseconfig(data, history):
 
                 if keys[0] == 'json':
                     prop = prop.json()
-                if keys[0] == 'headers':
+                elif keys[0] == 'headers':
                     prop = prop.headers
                 else:
-                    break
+                    continue
 
                 for k in keys[1:]:
                     if k in prop:

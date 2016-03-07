@@ -35,22 +35,23 @@ class HistoryMockup():
 class TestWrkloadr(unittest.TestCase):
 
     def test_parseconfig(self):
-        history = [HistoryMockup({'Content-Type': 'application/json'},
-                                 {'some-content': {'subcontent': 'ok'}}),
-                   HistoryMockup({'Some-custom-header': 'data'},
-                                 {'super-content': '123'})]
+        history = {'0': HistoryMockup({'Content-Type': 'application/json'},
+                     {'some-content': {'subcontent': 'ok'}}),
+                   '1': HistoryMockup({'Some-custom-header': 'data'},
+                     {'super-content': '123'})}
 
         data = {'headers': {
-                'custom-header': '{from(0).json.some-content.subcontent} value and {from(1).headers.some-custom-header}'},
+                'custom-header': '{{from(0).json.some-content.subcontent}} value and {{from(1).headers.Some-custom-header}}'},
                'body': {
-                'from-header-0': 'header: {from(0).headers.Content-Type}/stuff',
-                'from-body-1': 'body: {from(1).json.super-content}'}}
+                   'from-header-0': {
+                       'header': '{{from(0).headers.Content-Type}}/stuff'},
+                    'from-body-1': 'body: {{from(1).json.super-content}}'}}
 
         parsed = wrkloadr.parseconfig(data, history)
 
         self.assertEqual(parsed['headers']['custom-header'],
                          'ok value and data')
         self.assertEqual(parsed['body']['from-header-0'],
-                         'header: application/json/stuff')
+                         {'header': 'application/json/stuff'})
         self.assertEqual(parsed['body']['from-body-1'],
                          'body: 123')
