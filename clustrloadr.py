@@ -47,7 +47,8 @@ def sessionizer(session, requests, output):
     """
 
     processes = [Process(target=instanciator,
-                         args={'requests':requests, 'output':output, **session})
+                         args={'requests': requests,
+                               'output': output} + session)
                  for s in session]
 
     for p in processes:
