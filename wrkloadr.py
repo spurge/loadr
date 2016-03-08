@@ -130,6 +130,8 @@ def singlerepeater(repeat, writer, config):
                 if 'name' in req:
                     history[req['name']] = res
 
+        sess.close()
+
 
 def multirepeater(concurrency, repeat, writer, requestconfig):
     config = configdefaults(requestconfig)

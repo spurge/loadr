@@ -17,7 +17,11 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import unittest
+from functools import partial
+from io import StringIO
+from multiprocessing import Queue
+from requests import Response, Session
+from unittest import TestCase
 
 import wrkloadr
 
@@ -32,7 +36,7 @@ class HistoryMockup():
         return self.body
 
 
-class TestWrkloadr(unittest.TestCase):
+class TestWrkloadr(TestCase):
 
     def test_parseconfig(self):
         history = {'0': HistoryMockup({'Content-Type': 'application/json'},
@@ -55,3 +59,62 @@ class TestWrkloadr(unittest.TestCase):
                          {'header': 'application/json/stuff'})
         self.assertEqual(parsed['body']['from-body-1'],
                          'body: 123')
+
+    def test_send(self):
+        sess = Session()
+        res = wrkloadr.send({'method': 'GET',
+                             'url': 'http://thebrewery.se/',
+                             'headers': None,
+                             'body': None},
+                            sess,
+                            [])
+        sess.close()
+        self.assertIsInstance(res, Response)
+
+    def test_singlerepeater(self):
+        lines = StringIO()
+
+        def writer(lines, *args):
+            lines.write('.')
+            self.assertEqual(len(args), 6)
+
+            for val in args:
+                self.assertIsInstance(val, int)
+
+        wrkloadr.singlerepeater(2,
+                                partial(writer, lines),
+                                [{'method': 'GET',
+                                  'url': 'http://thebrewery.se/',
+                                  'headers': None,
+                                  'body': None,
+                                  'repeat': 1},
+                                 {'method': 'GET',
+                                  'url': 'http://thebrewery.se/',
+                                  'headers': None,
+                                  'body': None,
+                                  'repeat': 2}])
+        self.assertEqual(len(lines.getvalue()), 6)
+
+    def test_multirepeater(self):
+        output = Queue()
+
+        def writer(output, *args):
+
+        wrkloadr.multirepeater(2, 3, output.put,
+                               [{'method': 'GET',
+                                  'url': 'http://thebrewery.se/',
+                                  'headers': None,
+                                  'body': None,
+                                  'repeat': 1},
+                                 {'method': 'GET',
+                                  'url': 'http://thebrewery.se/',
+                                  'headers': None,
+                                  'body': None,
+                                  'repeat': 2}])
+
+        while True:
+            try:
+                data = output.get(True, 10)
+            except queue.Empty:
+                break
+
