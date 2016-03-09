@@ -25,6 +25,24 @@ import clustrloadr
 
 class TestClustrloadr(TestCase):
 
-    def test_instanciator(self):
-        output 
-        clustrloadr.instanciator(2, 3, 4, 
+    def test_provider(self):
+        output = Queue()
+        provider = clustrloadr.Provider('Localhost',
+                                        output)
+        provider.start(10)
+        provider.run(1, 1, [{'url': 'http://thebrewery.se'}])
+        provider.stop()
+
+        lines = 0
+
+        while True:
+            try:
+                data = output.get(True, 2)
+            except:
+                break
+
+            if data[0] == 'data':
+                self.assertRegex(data[2], '^([0-9]+,){5}[0-9]+$')
+                lines += 1
+
+        self.assertEqual(lines, 10)

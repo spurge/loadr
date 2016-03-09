@@ -17,31 +17,49 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from multiprocessing import Process
+import sys
 
-import providers
+from multiprocessing import Process, Queue
+
+class Provider:
+
+    def __init__(self, name, output, **config):
+        try:
+            exec('from providers.{1} import {0}'
+                 .format(name, name.lower()))
+
+            self.provider = locals()[name](**config, output=output)
+        except ImportError:
+            raise ValueError('No provider with name "{}" in "providers.{}"'
+                             .format(name, name.lower()))
+
+    def start(self, instances):
+        self.provider.create_instances(instances)
+
+    def stop(self):
+        self.provider.remove_instances()
+        self.provider.shutdown()
+
+    def run(self, concurrency, repeat, requests):
+        self.provider.run_multiple_workers(concurrency,
+                                           repeat,
+                                           requests)
 
 
-def instanciator(instances, concurrency, repeat, output,
-                 environment, requests):
-    """Creates a provider specified in the environment and makes it create
-    instances. Then run workers on all instances and write all ouput to
-    specified output writer.
-    """
+class Session:
 
-    provider = providers.get_provider(environment, output)
+    def __init__(self, output):
+        self.providers = []
+        self.output = output
 
-    if provider is not None:
-        provider.create_instances(instances)
-        provider.run_multiple_workers(concurrency,
-                                      repeat,
-                                      requests)
-        provider.remove_instances()
-        provider.shutdown()
-    elif 'type' not in environment:
-        raise ValueError('Type of provider not defined')
-    else:
-        raise ValueError('Unknown provider type: "%s"' % environment['type'])
+    def add_provider(self, name, concurrency, repeat, **config):
+        self.providers += {'concurrency': concurrency,
+                           'provider': Provider(name,
+                                                self.output,
+                                                **config)}
+
+    def start(self):
+        pass
 
 
 def sessionizer(session, requests, output):
