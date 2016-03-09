@@ -17,14 +17,14 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from .awsec2 import Awsec2
-from .glesys import Glesys
+from multiprocessing import Queue
+from unittest import TestCase
+
+import clustrloadr
 
 
-def get_provider(config, output):
-    if config['type'] == 'awsec2':
-        return Awsec2(**config, output=output)
-    if config['type'] == 'glesys':
-        return Glesys(**config, output=output)
+class TestClustrloadr(TestCase):
 
-    return None
+    def test_instanciator(self):
+        output 
+        clustrloadr.instanciator(2, 3, 4, 

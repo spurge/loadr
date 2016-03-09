@@ -17,10 +17,13 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import sys
+
 from functools import partial
 from io import StringIO
-from multiprocessing import Queue
+from multiprocessing import Value
 from requests import Response, Session
+from time import sleep
 from unittest import TestCase
 
 import wrkloadr
@@ -72,11 +75,12 @@ class TestWrkloadr(TestCase):
         self.assertIsInstance(res, Response)
 
     def test_singlerepeater(self):
-        lines = StringIO()
+        lines = Value('i', 0)
 
         def writer(lines, *args):
-            lines.write('.')
+            lines.value += 1
             self.assertEqual(len(args), 6)
+            sys.stdout.write('')
 
             for val in args:
                 self.assertIsInstance(val, int)
@@ -93,14 +97,21 @@ class TestWrkloadr(TestCase):
                                   'headers': None,
                                   'body': None,
                                   'repeat': 2}])
-        self.assertEqual(len(lines.getvalue()), 6)
+
+        self.assertEqual(lines.value, 6)
 
     def test_multirepeater(self):
-        output = Queue()
+        lines = Value('i', 0)
 
-        def writer(output, *args):
+        def writer(lines, *args):
+            lines.value += 1
+            self.assertEqual(len(args), 6)
+            sys.stdout.write('')
 
-        wrkloadr.multirepeater(2, 3, output.put,
+            for val in args:
+                self.assertIsInstance(val, int)
+
+        wrkloadr.multirepeater(2, 3, partial(writer, lines),
                                [{'method': 'GET',
                                   'url': 'http://thebrewery.se/',
                                   'headers': None,
@@ -112,9 +123,4 @@ class TestWrkloadr(TestCase):
                                   'body': None,
                                   'repeat': 2}])
 
-        while True:
-            try:
-                data = output.get(True, 10)
-            except queue.Empty:
-                break
-
+        self.assertEqual(lines.value, 18)

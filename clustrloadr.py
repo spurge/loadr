@@ -29,11 +29,13 @@ def instanciator(instances, concurrency, repeat, output,
     specified output writer.
     """
 
-    provider = providers.get_provider(environment)
+    provider = providers.get_provider(environment, output)
 
     if provider is not None:
         provider.create_instances(instances)
-        provider.run_multiple_workers(concurrency, repeat, requests, output)
+        provider.run_multiple_workers(concurrency,
+                                      repeat,
+                                      requests)
         provider.remove_instances()
         provider.shutdown()
     elif 'type' not in environment:
