@@ -17,7 +17,9 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from multiprocessing import Process
+import sys
+
+from functools import partial
 
 from wrkloadr import multirepeater
 
@@ -30,35 +32,30 @@ class Localhost:
 
     def create_instances(self, instances):
         self.instances = ['localhost-%d' % i for i in range(instances)]
+        sys.stdout.write('provider: %s\n' % str(len(self.instances)))
 
     def remove_instances(self):
         self.instances = []
 
-    def create_writer(self, instance):
-        def writer(*data):
-            csv = ','.join([str(v) for v in data])
-            self.output.put(('data', instance, csv))
-
-        return writer
+    def writer(self, instance, *data):
+        csv = ','.join([str(v) for v in data])
+        self.output.put(('data', instance, csv))
 
     def run_single_worker(self, instance, concurrency,
                           repeat, requests):
+        sys.stdout.write('worker: %s\n' % str(concurrency))
         multirepeater(concurrency,
                       repeat,
-                      self.create_writer(instance),
+                      partial(self.writer, instance),
                       requests)
-        self.output.put(('status', instance, 'ended'))
 
     def run_multiple_workers(self, concurrency, repeat, requests):
-        processes = [Process(target=self.run_single_worker,
-                             args=(i, concurrency, repeat, requests))
-                     for i in self.instances]
-
-        for p in processes:
-            p.start()
-
-        for p in processes:
-            p.join()
+        sys.stdout.write('multi: {} * {}\n'.format(str(len(self.instances)), str(concurrency)))
+        self.run_single_worker('localhost',
+                               len(self.instances) * concurrency,
+                               repeat,
+                               requests)
+        self.output.put(('status', 'localhost', 'ended'))
 
     def shutdown(self):
         pass

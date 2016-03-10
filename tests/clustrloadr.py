@@ -17,6 +17,8 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import sys
+
 from multiprocessing import Queue
 from unittest import TestCase
 
@@ -29,8 +31,9 @@ class TestClustrloadr(TestCase):
         output = Queue()
         provider = clustrloadr.Provider('Localhost',
                                         output)
-        provider.start(10)
-        provider.run(1, 1, [{'url': 'http://thebrewery.se'}])
+        provider.start(3)
+        provider.run(2, 1, [{'url': 'http://thebrewery.se'}])
+        provider.run(1, 2, [{'url': 'http://thebrewery.se'}])
         provider.stop()
 
         lines = 0
@@ -45,4 +48,39 @@ class TestClustrloadr(TestCase):
                 self.assertRegex(data[2], '^([0-9]+,){5}[0-9]+$')
                 lines += 1
 
-        self.assertEqual(lines, 10)
+        self.assertEqual(lines, 12)
+
+    def test_session(self):
+        output = Queue()
+        session = clustrloadr.Session(output)
+
+        session.providers({'provider-1': {'type': 'Localhost'},
+                           'provider-2': {'type': 'Localhost'}})
+        session.requests([{'url': 'http://thebrewery.se'}])
+
+        session.start([{'provider': 'provider-1',
+                        'instances': 2,
+                        'concurrency': 1,
+                        'repeat': 2},
+                       {'provider': 'provider-2',
+                        'instances': 3,
+                        'concurrency': 2,
+                        'repeat': 1}])
+        session.run()
+        session.run()
+        session.stop()
+
+        lines = 0
+
+        while True:
+            try:
+                data = output.get(True, 2)
+                sys.stdout.write(str(data))
+            except:
+                break
+
+            if data[0] == 'data':
+                self.assertRegex(data[2], '^([0-9]+,){5}[0-9]+$')
+                lines += 1
+
+        self.assertEqual(lines, 18)

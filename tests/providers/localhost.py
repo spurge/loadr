@@ -51,7 +51,10 @@ class TestLocalhost(unittest.TestCase):
         stderr = ''
 
         while True:
-            data = self.output.get(True, 120)
+            try:
+                data = self.output.get(True, 2)
+            except:
+                break
 
             if data[0] == 'data':
                 stdout.append(data)
