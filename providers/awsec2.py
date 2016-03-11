@@ -23,7 +23,7 @@ import paramiko
 import sys
 
 from io import StringIO
-from multiprocessing import Process, Queue
+from multiprocessing import get_context, Queue
 from time import sleep
 
 
@@ -219,6 +219,8 @@ pip install requests
 
                 lastline = lines[-1]
 
+                sys.stdout.write('%s\n' % lastline)
+
             if len(stderr) > 0:
                 self.output.put(('error', instance.id,
                                  stderr.decode('utf-8')))
@@ -240,8 +242,9 @@ pip install requests
         """
 
         # Initialize the instance processes
-        processes = [Process(target=self.run_single_worker,
-                             args=(i, concurrency, repeat, requests))
+        mp = get_context('fork')
+        processes = [mp.Process(target=self.run_single_worker,
+                                args=(i, concurrency, repeat, requests))
                      for i in self.instances]
 
         # Start processes

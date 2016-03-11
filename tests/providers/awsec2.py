@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from clustrloadr import Session
 from providers.awsec2 import Awsec2
 from tests.providers.localhost import TestLocalhost
 
@@ -30,3 +31,13 @@ class TestAwsec2(TestLocalhost):
                                image_id='ami-d22932be',
                                region='eu-central-1',
                                output=self.output)
+        self.session.providers({'provider-1': {'type': 'Awsec2',
+                                               'profile': 'loadr',
+                                               'instance_type': 't2.micro',
+                                               'image_id': 'ami-d22932be',
+                                               'region': 'eu-central-1'},
+                                'provider-2': {'type': 'Awsec2',
+                                               'profile': 'loadr',
+                                               'instance_type': 't2.micro',
+                                               'image_id': 'ami-d22932be',
+                                               'region': 'eu-central-1'}})
