@@ -19,8 +19,7 @@ along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
 
-from multiprocessing import get_context
-from multiprocessing.sharedctypes import Array, Value
+from multiprocessing import get_context, Pipe
 
 class Provider:
 
@@ -34,7 +33,6 @@ class Provider:
                              .format(name, name.lower()))
 
     def start(self, instances):
-        sys.stdout.write('start: %s\n' % str(instances))
         self.provider.create_instances(instances)
 
     def stop(self):
@@ -50,13 +48,13 @@ class Provider:
 class Session:
 
     def __init__(self, output):
-        self._providers = Array(Provider, [])
-        self._requests = Array(dict, [])
-        self._session = Array(dict, [])
+        self._providers = {}
+        self._requests = []
+        self._session = []
         self.output = output
 
     def add_provider(self, name, provider_type, **config):
-        self._providers.value[name] = Provider(provider_type,
+        self._providers[name] = Provider(provider_type,
                                          self.output,
                                          **config)
 
@@ -70,11 +68,11 @@ class Session:
                                  in config.items()
                                  if key != 'type'})
 
-        return self._providers.value
+        return self._providers
 
     def requests(self, requests=None):
         if requests is not None:
-            self._requests = Array(dict, requests)
+            self._requests = requests
 
         return self._requests
 
@@ -83,18 +81,27 @@ class Session:
         processes = []
         mp = get_context('fork')
 
-        for s in self._session:
-            provider = self._providers.value[s['provider']]
-            process = mp.Process(target=provider.start,
-                                 args=(s['instances'],))
-            process.start()
-            processes += [process]
+        def startwrapper(provider, instances, pipe):
+            provider.start(instances)
+            pipe.send(provider.provider.instances)
+            pipe.close()
 
-        for p in processes:
-            p.join()
+        for s in self._session:
+            parent, child = Pipe()
+            provider = self._providers[s['provider']]
+            process = mp.Process(target=startwrapper,
+                                 args=(provider,
+                                       s['instances'],
+                                       child))
+            process.start()
+            processes += [(provider, process, parent)]
+
+        for (provider, process, pipe) in processes:
+            provider.provider.instances = pipe.recv()
+            process.join()
 
     def stop(self):
-        for provider in self._providers.value.values():
+        for provider in self._providers.values():
             provider.stop()
 
     def run(self):
@@ -102,7 +109,7 @@ class Session:
         mp = get_context('fork')
 
         for s in self._session:
-            provider = self._providers.value[s['provider']]
+            provider = self._providers[s['provider']]
             process = mp.Process(target=provider.run,
                                  args=(s['concurrency'],
                                        s['repeat'],

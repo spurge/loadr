@@ -75,7 +75,6 @@ class TestClustrloadr(TestCase):
         while True:
             try:
                 data = output.get(True, 2)
-                sys.stdout.write(str(data))
             except:
                 break
 
@@ -83,4 +82,4 @@ class TestClustrloadr(TestCase):
                 self.assertRegex(data[2], '^([0-9]+,){5}[0-9]+$')
                 lines += 1
 
-        self.assertEqual(lines, 18)
+        self.assertEqual(lines, 20)

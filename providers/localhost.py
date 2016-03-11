@@ -20,6 +20,7 @@ along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 import sys
 
 from functools import partial
+from multiprocessing import Array
 
 from wrkloadr import multirepeater
 
@@ -32,7 +33,6 @@ class Localhost:
 
     def create_instances(self, instances):
         self.instances = ['localhost-%d' % i for i in range(instances)]
-        sys.stdout.write('provider: %s\n' % str(len(self.instances)))
 
     def remove_instances(self):
         self.instances = []
@@ -43,14 +43,12 @@ class Localhost:
 
     def run_single_worker(self, instance, concurrency,
                           repeat, requests):
-        sys.stdout.write('worker: %s\n' % str(concurrency))
         multirepeater(concurrency,
                       repeat,
                       partial(self.writer, instance),
                       requests)
 
     def run_multiple_workers(self, concurrency, repeat, requests):
-        sys.stdout.write('multi: {} * {}\n'.format(str(len(self.instances)), str(concurrency)))
         self.run_single_worker('localhost',
                                len(self.instances) * concurrency,
                                repeat,
