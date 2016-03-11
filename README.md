@@ -9,15 +9,17 @@ complex series of requests and true concurrency from several instances.
 TODO
 ----
 
-* Rewrite `clustrloadr.py` to first initiate all providers with instances and
-  then launch all workers at the same time.
-* Write tests for `clustrloadr.py` and `workrloadr.py`.
+* Make `clustrloadr.py` thread safe.
 * UIs: csv, ncurses and json.
 * Rewrite `cli.py` with three threads:
 	- Main-thread which parses config files and launches the two other threads.
 	- UI-thread which has a `Pipe` and a `Queue` connected to the
 	  Cluster-thread.
 	- Cluster-thread which uses `clustrloadr.py` to launch instances.
+* Add more providers
+	- Glesys
+	- Rackspace
+	- ...
 
 loadr.py
 --------
