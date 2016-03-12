@@ -31,11 +31,17 @@ class Localhost:
         self.output = output
         self.instances = []
 
-    def create_instances(self, instances):
+    def create_instances(self, instances, wait=None):
         self.instances = ['localhost-%d' % i for i in range(instances)]
 
-    def remove_instances(self):
+    def wait_for_running_instances(self):
+        pass
+
+    def remove_instances(self, wait=None):
         self.instances = []
+
+    def wait_for_removed_instances(self):
+        pass
 
     def writer(self, instance, *data):
         csv = ','.join([str(v) for v in data])

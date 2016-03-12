@@ -1,10 +1,10 @@
 {
-	"aws": {
+	"awsec2": {
 		"type": "awsec2",
 		"profile": "loadr",
-		"type": "t2.medium",
-		"image": "ami-xxxxxx",
-		"region": ""
+		"type": "t2.micro",
+		"image": "ami-d22932be",
+		"region": "eu-central-1"
 	},
 	"glesys": {
 		"type": "glesys",

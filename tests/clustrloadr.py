@@ -27,29 +27,6 @@ import clustrloadr
 
 class TestClustrloadr(TestCase):
 
-    def test_provider(self):
-        output = Queue()
-        provider = clustrloadr.Provider('Localhost',
-                                        output)
-        provider.start(3)
-        provider.run(2, 1, [{'url': 'http://thebrewery.se'}])
-        provider.run(1, 2, [{'url': 'http://thebrewery.se'}])
-        provider.stop()
-
-        lines = 0
-
-        while True:
-            try:
-                data = output.get(True, 2)
-            except:
-                break
-
-            if data[0] == 'data':
-                self.assertRegex(data[2], '^([0-9]+,){5}[0-9]+$')
-                lines += 1
-
-        self.assertEqual(lines, 12)
-
     def test_session(self):
         output = Queue()
         session = clustrloadr.Session(output)

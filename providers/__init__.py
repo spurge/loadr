@@ -17,14 +17,13 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from .awsec2 import Awsec2
-from .glesys import Glesys
+def get_provider(name, output, **config):
+    try:
+        exec('from providers.{1} import {0}'
+             .format(name, name.lower()))
+        provider = locals()[name](**config, output=output)
+    except ImportError:
+        raise ValueError('No provider with name "{}" in "providers.{}"'
+                         .format(name, name.lower()))
 
-
-def get_provider(config, output):
-    if config['type'] == 'awsec2':
-        return Awsec2(**config, output=output)
-    if config['type'] == 'glesys':
-        return Glesys(**config, output=output)
-
-    return None
+    return provider

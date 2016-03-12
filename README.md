@@ -9,7 +9,8 @@ complex series of requests and true concurrency from several instances.
 TODO
 ----
 
-* Make `clustrloadr.py` thread safe.
+* AWS seems to limit concurrent connections.
+	- I might make providers able to create instance nests.
 * UIs: csv, ncurses and json.
 * Rewrite `cli.py` with three threads:
 	- Main-thread which parses config files and launches the two other threads.

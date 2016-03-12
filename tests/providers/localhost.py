@@ -45,6 +45,7 @@ class TestLocalhost(unittest.TestCase):
         self.assertIsNotNone(self.provider)
 
         self.provider.create_instances(1)
+        self.provider.wait_for_running_instances()
         self.assertEqual(len(self.provider.instances), 1)
 
         self.provider.run_multiple_workers(concurrency=2,
@@ -75,18 +76,19 @@ class TestLocalhost(unittest.TestCase):
         self.assertEqual(len(stderr), 0)
 
         self.provider.remove_instances()
+        self.provider.wait_for_removed_instances()
         self.assertEqual(len(self.provider.instances), 0)
 
     def test_session(self):
         self.session.requests([{'url': 'http://thebrewery.se'}])
         self.session.start([{'provider': 'provider-1',
-                        'instances': 2,
-                        'concurrency': 1,
-                        'repeat': 2},
-                       {'provider': 'provider-2',
-                        'instances': 3,
-                        'concurrency': 2,
-                        'repeat': 1}])
+                             'instances': 2,
+                             'concurrency': 1,
+                             'repeat': 2},
+                            {'provider': 'provider-2',
+                             'instances': 3,
+                             'concurrency': 2,
+                             'repeat': 1}])
         self.session.run()
         self.session.run()
         self.session.stop()

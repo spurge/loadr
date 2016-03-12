@@ -110,9 +110,10 @@ pip install requests
 
         return sg
 
-    def create_instances(self, instances):
+    def create_instances(self, instances, wait=True):
         """Creates x number of instances.
         Instance type and image where defined in the class __init__.
+        This method is not thread-safe!
         """
 
         self.output.put(('status', 'awsec2', 'creating instances'))
@@ -126,20 +127,37 @@ pip install requests
                             KeyName=self.keypair.name,
                             SecurityGroupIds=[self.securitygroup.id])
 
-        # Then wait for them all to be ready
+        if wait:
+            self.wait_for_running_instances()
+
+    def wait_for_running_instances(self):
+        """Blocks current thread until all instances are running.
+        This method must be thread-safe.
+        """
+
         for i in self.instances:
             i.wait_until_running()
-            i.load()
             self.output.put(('status', i.id, 'running'))
 
-    def remove_instances(self):
+    def remove_instances(self, wait=True):
         """Terminates all instances.
+        This method is not thread-safe.
         """
 
         for i in self.instances:
             i.terminate()
+
+        if wait:
+            self.wait_for_removed_instances()
+
+    def wait_for_removed_instances(self):
+        """Blocks current thread until all instances are terminated.
+        This method must be thread-safe.
+        """
+
+        for i in self.instances:
             i.wait_until_terminated()
-            self.output.put(('status', i.id, 'terminated'))
+            self.output.put(('status', i.id, 'removed'))
 
         self.instances = []
 
@@ -153,6 +171,11 @@ pip install requests
 
         self.output.put(('status', instance.id, 'connecting'))
 
+        # Get all the necessary data for the instance,
+        # like IP and dns name.
+        instance.wait_until_running()
+        instance.load()
+
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -160,7 +183,7 @@ pip install requests
         key = paramiko.RSAKey.from_private_key(keyfile)
 
         # Number of retries
-        retries = 3
+        retries = 10
 
         # Retry loop
         for r in range(retries):
