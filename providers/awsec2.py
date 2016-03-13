@@ -26,6 +26,8 @@ from io import StringIO
 from multiprocessing import get_context, Queue
 from time import sleep
 
+from util import random_string
+
 
 class Awsec2:
     """Creates EC2 instances at AWS
@@ -79,14 +81,16 @@ pip install requests
         """Creates a rsa key pair for ssh access
         """
 
-        keypair = self.ec2.KeyPair('loadr')
+        keyname = 'loadr-%s' % random_string()
+        keypair = self.ec2.KeyPair(keyname)
         keypair.delete()
-        return self.ec2.create_key_pair(KeyName='loadr')
+        return self.ec2.create_key_pair(KeyName=keyname)
 
     def create_securitygroup(self):
         """Creates a security policy which makes a ssh access possible
         """
 
+        sgname = 'loadr-%s' % random_string()
         sg = None
 
         # Look for existing security group
@@ -95,13 +99,13 @@ pip install requests
                 break
 
             for group in vpc.security_groups.all():
-                if group.group_name == 'loadr':
+                if group.group_name == sgname:
                     sg = group
                     break
 
         # Create one if non-existent
         if sg is None:
-            sg = self.ec2.create_security_group(GroupName='loadr',
+            sg = self.ec2.create_security_group(GroupName=sgname,
                                                 Description='loadr ssh access')
             sg.authorize_ingress(IpProtocol='tcp',
                                  CidrIp='0.0.0.0/0',
@@ -228,10 +232,6 @@ pip install requests
                 break;
 
             if len(stdout) > 0:
-                # Unfinished line parsing.
-                # The last line can end with an \n or in the middle of
-                # of the line.
-
                 lines = stdout.decode('utf-8').split('\n')
 
                 for csv in [lastline] + lines[:-1]:
@@ -241,8 +241,6 @@ pip install requests
                                          csv))
 
                 lastline = lines[-1]
-
-                sys.stdout.write('%s\n' % lastline)
 
             if len(stderr) > 0:
                 self.output.put(('error', instance.id,
