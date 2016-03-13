@@ -17,15 +17,36 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import sys
+from multiprocessing import get_context
 
-from clustrloadr import instanciator
-from wrkloadr import multirepeater
+import ui
+
+from clustrloadr import Session
 
 
-def loadr(environments, requests, sessionconfig):
-    sessions = loadconfig(sessionconfig)
+class Loadr:
 
-    for s in sessions:
-        instanciator(s['environment'], s['instances'], s['concurrency'],
-                     s['repeat'], sys.stdout, environments, requests)
+    def __init__(self):
+        mp = get_context('fork')
+        self._output = mp.Queue()
+
+        self._ui = None
+        self._session = None
+
+    def ui(self, name=None, module=None):
+        if name is not None:
+            self._ui = ui.get_ui(name, output=self._output)
+        elif module is not None:
+            self._ui = module(output=self._output)
+
+    def session(self, config):
+        self._session = Session(self._output)
+
+    def requests(self, config):
+        self.session.requests(config)
+
+    def providers(self, config):
+        self.session.providers(config)
+
+    def start(self, config):
+        self.session.start(config)
