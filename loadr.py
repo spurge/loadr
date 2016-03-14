@@ -28,9 +28,13 @@ class Loadr:
 
     def __init__(self):
         mp = get_context('fork')
+
         self._output = mp.Queue()
 
         self._ui = None
+        self._process_ui = None
+
+        sels._process_session = None
         self._session = None
 
     def ui(self, name=None, module=None):
@@ -39,14 +43,20 @@ class Loadr:
         elif module is not None:
             self._ui = module(output=self._output)
 
+        if self._ui is not None:
+            mp = get_context('fork')
+            self._process_ui = mp.Process(target=self._ui.start)
+
     def session(self, config):
         self._session = Session(self._output)
 
     def requests(self, config):
-        self.session.requests(config)
+        self._session.requests(config)
 
     def providers(self, config):
-        self.session.providers(config)
+        self._session.providers(config)
 
     def start(self, config):
-        self.session.start(config)
+        mp = get_context('fork')
+        self._process_session = mp.Process(target=self._session.start,
+                                           args=(config,))
