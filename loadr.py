@@ -29,26 +29,26 @@ class Loadr:
     def __init__(self):
         mp = get_context('fork')
 
-        self._output = mp.Queue()
-
         self._ui = None
-        self._process_ui = None
+        self._ui_process = None
+        self._ui_output = mp.Queue()
 
-        sels._process_session = None
-        self._session = None
+        self._session = Session(self._session_output)
+        self._session_process = None
+        self._session_output = mp.Queue()
 
     def ui(self, name=None, module=None):
         if name is not None:
-            self._ui = ui.get_ui(name, output=self._output)
+            self._ui = ui.get_ui(name,
+                                 input=self._session_output,
+                                 output=self._ui_output)
         elif module is not None:
-            self._ui = module(output=self._output)
+            self._ui = module(input=self._session_output,
+                              output=self._output)
 
         if self._ui is not None:
             mp = get_context('fork')
-            self._process_ui = mp.Process(target=self._ui.start)
-
-    def session(self, config):
-        self._session = Session(self._output)
+            self._ui_process = mp.Process(target=self._ui.start)
 
     def requests(self, config):
         self._session.requests(config)

@@ -21,73 +21,59 @@ import click
 import json
 import sys
 
-from multiprocessing import Process, Queue
-
-from clustrloadr import instanciator
-from loadr import loadr
+from clustrloadr import Session
+from loadr import Loadr
 from util import config
-from wrkloadr import multirepeater
-
-
-def logger(output):
-    while True:
-        data = output.get(True, 120)
-
-        if data[0] == 'data':
-            sys.stdout.write(data[2])
-
-        if data[0] == 'error':
-            sys.stderr.write(data[2])
-
-
-def wrapper(func, kwargs):
-    output = Queue()
-
-    log = Process(target=logger, args=(output))
-    stuff = Process(target=func, args={**kwargs, 'output': output})
-
-    log.start()
-    stuff.start()
-
-    stuff.join()
-    log.join()
+from wrkloadr import multirepeater, csvwriter
 
 
 @click.command()
-@click.option('-c', '--concurrency', type=int, default=1)
-@click.option('-r', '--repeat', type=int, default=1)
-@click.option('-o', '--output', type=str, default=sys.stdout)
-@click.argument('requestfile', type=click.File('r'), default=sys.stdin)
-def worker(concurrency, repeat, output, requestfile):
-    multirepeater(concurrency, repeat, output,
+@click.option('-c', '--concurrency', type=int, default=1,
+              help='How many concurrent requests to send')
+@click.option('-r', '--repeat', type=int, default=1,
+              help='How many times to repeat the whole requests cycle')
+@click.argument('requestfile', type=click.File('r'), default=sys.stdin,
+                help='Requests cycle configuration json file')
+def worker(concurrency, repeat, requestfile):
+    multirepeater(concurrency, repeat, csvwriter(sys.stdout.write),
                   config.load(requestfile))
 
 
 @click.command()
-@click.option('-p', '--provider', type=str)
+@click.option('-p', '--provider', type=str,
+              help='Which provider to use from the environment config json file')
 @click.option('-i', '--instances', type=int, default=1,
-              help='Number of instances')
+              help='Number of instances to run at the provider')
 @click.option('-c', '--concurrency', type=int, default=1,
-              help='Concurrency per instance')
-@click.option('-r', '--repeat', type=int, default=1)
-@click.option('-o', '--output', type=str, default=sys.stdout)
+              help='How many concurrent requests per instance')
+@click.option('-r', '--repeat', type=int, default=1,
+              help='How many times to repeat the whole requests cycle')
 @click.option('-e', '--environments', type=click.File('r'),
-              help='Environments configuration file')
+              help='Environments configuration json file')
 @click.option('-q', '--requests', type=click.File('r'),
-              help='Requests configuration file')
+              help='Requests cycle configuration json file')
 def cluster(provider, instances, concurrency, repeat,
-              output, environments, requests):
-    instanciator(instances, concurrency, repeat, output,
-                 config.load(environments)[provider],
-                 config.load(requests))
-
+            output, environments, requests):
+    loadr = Loadr()
+    loadr.ui('Csv')
+    loadr.providers(config.load(environments))
+    loadr.requests(config.load(requests))
+    loadr.start({'provider': provider,
+                   'instances': instances,
+                   'concurrency': concurrency,
+                   'repeat': repeat})
 
 @click.command()
+@click.option('-s', '--session', type=click.File('r'),
+              help='Session configuration json file')
 @click.option('-e', '--environments', type=click.File('r'),
-              help='Environments configuration file')
+              help='Environments configuration json file')
 @click.option('-q', '--requests', type=click.File('r'),
-              help='Requests configuration file')
-@click.argument('sessionfile', type=click.File('r'), default=sys.stdin)
-def main(environments, requests, sessionfile):
-    loadr(config.load(environments), config.load(requests),
-          config.load(sessionfile))
+              help='Requests cycle configuration json file')
+@click.option('-u', '--ui', type=str, default='Csv',
+              help='Which ui to use')
+def main(session, environments, requests, ui):
+    loadr = Loadr()
+    loadr.ui(ui)
+    loadr.providers(config.load(environments))
+    loadr.requests(config.load(requests))

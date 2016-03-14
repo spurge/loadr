@@ -17,23 +17,23 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from setuptools import setup
+from sys import stderr, stdout
 
-setup(
-    name='loadr',
-    version='0.1',
-    py_modules=['loadr'],
-    install_requires=[
-        'boto3',
-        'click',
-        'gnupg',
-        'paramiko',
-        'requests'
-    ],
-    entry_points='''
-        [console_scripts]
-        loadr=cli:main
-        loadr:worker=cli:worker
-        loadr:cluster=cli:cluster
-    ''',
-)
+
+class Csv:
+
+    def __init__(self, input, output):
+        self.input = input
+
+    def start(self):
+        while True:
+            try:
+                data = self.input.get(True)
+            except:
+                break
+
+            if data[0] == 'data':
+                stdout.write('%s\n' % data[2])
+
+            if data[0] == 'error':
+                stderr.write('%s\n' % data[2])
