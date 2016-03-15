@@ -20,7 +20,7 @@ along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 import json
 import sys
 
-from multiprocessing import Process, Queue, get_context
+from multiprocessing import Process, Queue
 from requests import Request, Session, ConnectionError
 from re import finditer
 from time import time
@@ -135,8 +135,7 @@ def singlerepeater(repeat, writer, config):
 
 def multirepeater(concurrency, repeat, writer, requestconfig):
     config = configdefaults(requestconfig)
-    mp = get_context('fork')
-    processes = [mp.Process(target=singlerepeater,
+    processes = [Process(target=singlerepeater,
                             args=(repeat, writer, config))
                  for x in range(concurrency)]
 

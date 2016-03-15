@@ -17,23 +17,25 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from setuptools import setup
+from multiprocessing import get_context
+from unittest import TestCase
 
-setup(
-    name='loadr',
-    version='0.1',
-    py_modules=['loadr'],
-    install_requires=[
-        'boto3',
-        'click',
-        'gnupg',
-        'paramiko',
-        'requests'
-    ],
-    entry_points='''
-        [console_scripts]
-        loadr=cli:main
-        wrkloadr=cli:worker
-        clustrloadr=cli:cluster
-    ''',
-)
+from ui import get_ui
+
+class TestCsv(TestCase):
+
+    def test_csv(self):
+        mp = get_context('fork')
+        queue = mp.Queue()
+        input, output = mp.Pipe()
+        csv = get_ui('Csv', input=queue, output=input)
+        ui_process = mp.Process(target=csv.start)
+        ui_process.start()
+
+        command_run = output.recv()
+        self.assertEqual(command_run, ('command', 'run'))
+
+        command_quit = output.recv()
+        self.assertEqual(command_quit, ('command', 'quit'))
+
+        ui_process.terminate()

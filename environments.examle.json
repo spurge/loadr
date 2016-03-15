@@ -1,13 +1,13 @@
 {
 	"awsec2": {
-		"type": "awsec2",
+		"type": "Awsec2",
 		"profile": "loadr",
-		"type": "t2.micro",
-		"image": "ami-d22932be",
+		"instance_type": "t2.micro",
+		"image_id": "ami-d22932be",
 		"region": "eu-central-1"
 	},
 	"glesys": {
-		"type": "glesys",
+		"type": "Glesys",
 		"apiuser": "",
 		"apikey": "",
 		"datacenter": "falkenberg",

@@ -24,8 +24,12 @@ class Csv:
 
     def __init__(self, input, output):
         self.input = input
+        self.output = output
 
     def start(self):
+        self.output.send(('command', 'run'))
+        self.output.send(('command', 'quit'))
+
         while True:
             try:
                 data = self.input.get(True)

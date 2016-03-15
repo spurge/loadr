@@ -17,6 +17,8 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import sys
+
 from multiprocessing import get_context
 
 import ui
@@ -33,36 +35,41 @@ class Loadr:
         self._ui_process = None
         self._ui_input, self._ui_output = mp.Pipe()
 
-        self._session = Session(self._session_output)
-        self._session_processes = []
         self._session_output = mp.Queue()
+        self._session = Session(self._session_output)
 
         self._listener_process = mp.Process(target=self._listener)
+        self._listener_process.start()
 
     def _listener(self):
         while True:
             data = self._ui_output.recv()
 
             if data[0] == 'command':
-                if data[1]
+                if data[1] == 'providers':
+                    sys.stdout.write('providers')
+                    self._session.providers(data[2])
+                elif data[1] == 'requests':
+                    sys.stdout.write('requests')
+                    self._session.requests(data[2])
                 elif data[1] == 'start':
-                    self._create_session_process(self._session.start,
-                                                 **data[2])
+                    sys.stdout.write('start...')
+                    self._session.start(data[2])
                 elif data[1] == 'run':
-                    self._create_session_process(self._session.run,
-                                                 **data[2])
-
-    def _create_session_process(self, method, **kwargs):
-        mp = get_context('fork')
-
-        self._session_processes += [mp.Process(target=method,
-                                               args=kwargs)]
+                    sys.stdout.write('run...')
+                    self._session.run()
+                elif data[1] == 'stop':
+                    sys.stdout.write('stop...')
+                    self._session.stop()
+                elif data[1] == 'quit':
+                    sys.stdout.write('quit...')
+                    self.quit()
 
     def ui(self, name=None, module=None):
         if name is not None:
             self._ui = ui.get_ui(name,
                                  input=self._session_output,
-                                 output=self._ui_output)
+                                 output=self._ui_input)
         elif module is not None:
             self._ui = module(input=self._session_output,
                               output=self._output)
@@ -70,15 +77,24 @@ class Loadr:
         if self._ui is not None:
             mp = get_context('fork')
             self._ui_process = mp.Process(target=self._ui.start)
+            self._ui_process.start()
 
     def requests(self, config):
-        self._ui_input.send(('command', 'start', config))
+        self._ui_input.send(('command', 'requests', config))
 
     def providers(self, config):
-        self._session.providers(config)
+        self._ui_input.send(('command', 'providers', config))
 
     def start(self, config):
         self._ui_input.send(('command', 'start', config))
 
+    def stop(self):
+        self._ui_input.send(('command', 'stop'))
+
     def run(self):
         self._ui_input.send(('command', 'run'))
+
+    def quit(self):
+        self.stop()
+        self._ui_process.terminate()
+        self._listener_process.terminate()

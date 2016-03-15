@@ -9,40 +9,140 @@ complex series of requests and true concurrency from several instances.
 TODO
 ----
 
-* UIs: csv, ncurses and json.
-* Rewrite `cli.py` with three threads:
-	- Main-thread which parses config files and launches the two other threads.
-	- UI-thread which has a `Pipe` and a `Queue` connected to the
-	  Cluster-thread.
-	- Cluster-thread which uses `clustrloadr.py` to launch instances.
 * Add more providers
 	- Glesys
 	- Rackspace
 	- ...
 * I might make providers able to create instance nests.
 
-loadr.py
+Install
+-------
+
+Run `pip install --editable .` in the loadr directory.
+
+Configure
+---------
+
+You need three json files.
+
+### Environments
+
+Defines the environments to run you instances in. There are just two providers
+at the moment: **Awsec2** and **Localhost**.
+
+
+	{
+		"awsec2": {
+			"type": "Awsec2",
+			"profile": "loadr",
+			"instance_type": "t2.micro",
+			"image_id": "ami-d22932be",
+			"region": "eu-central-1"
+		}
+	}
+
+### Requests
+
+Defines the requests cycle to run from your instances.
+
+	[
+		{
+			"name": "session",
+			"method": "POST",
+			"url": "http://host/create-session",
+			"body": {
+				"key": "sdlkfj"
+			},
+			"expect": {
+				"status": 200
+			}
+		},
+		{
+			"method": "POST",
+			"url": "http://host/create-stuff",
+			"headers": {
+				"Authorization": "Bearer {{from('session').json.token}}"
+			},
+			"body": {
+				"some-key": "with data"
+			}
+		},
+		{
+			"method": "GET",
+			"url": "http://host/stuff/{{from(1).json.stuff_id}}/status",
+			"headers": {
+				"Authorization": "Bearer {{from(0).json.token}}"
+			}
+		}
+	]
+
+### Session
+
+Defines how much your instances will hit the target(s).
+
+	[
+		{
+			"environment": "awsec2",
+			"instances": 10,
+			"concurrency": 100,
+			"repeat": 10000
+		}
+	]
+
+
+Using it
 --------
 
-* Wraps
-	- `clustrloadr.py` with instances/machines
-	- `wrkloadr.py` with setup/cycle file and wrapped within `clustrloadr.py`
-* Gathers all `csv` and merge it into something readable
-	- `ncurses`-based ui
-	- `json`-batches for a web ui
-	- ...
+### loadr
 
-clustrloadr.py
---------------
+Start loadr with a session, environment and requsts within a ui.
 
-* Parses a provided environment config json file
-* Initializes instances at some provider
-* Uploads & runs specified code in some wrapped mode (`wrkloadr.py`)
-* Merges all gathered `stdout` to a single stream
+There will be three uis:
 
-wrkloadr.py
------------
+* **csv** - which simply prints all data as csv
+* **json** - dumps json batches
+* **text** - some simple informative text version with statistics
 
-* Parses setup/call-cycle file
-* Starts making http(s) requests defined by call-cycle, concurrency and number of repeats
-* Output stats as `csv` to `stdout` or specified file
+`loadr -s session.json -e environments.json -q requests.json -u Csv`
+
+	Usage: loadr [OPTIONS]
+
+	Options:
+	  -s, --session FILENAME       Session configuration json file
+	  -e, --environments FILENAME  Environments configuration json file
+	  -q, --requests FILENAME      Requests cycle configuration json file
+	  -u, --ui TEXT                Which ui to use
+	  --help                       Show this message and exit.
+
+### clustrloadr
+
+Runs loadr without the session file. And spits out the data as csv. For quick and easy provider setup testing.
+
+`clustrloadr -p awsec2 -i 10 -c 100 -r 10000 -e environments.json -q requests.json`
+
+	Usage: clustrloadr [OPTIONS]
+
+	Options:
+	  -p, --provider TEXT          Which provider to use from the environment
+								   config json file
+	  -i, --instances INTEGER      Number of instances to run at the provider
+	  -c, --concurrency INTEGER    How many concurrent requests per instance
+	  -r, --repeat INTEGER         How many times to repeat the whole requests
+								   cycle
+	  -e, --environments FILENAME  Environments configuration json file
+	  -q, --requests FILENAME      Requests cycle configuration json file
+	  --help                       Show this message and exit.
+
+### wrkloadr
+
+This is what's running on the instances - and a great way to test the request cycle configuration.
+
+`wrkloadr -c 1 -r requests.json`
+
+	Usage: wrkloadr [OPTIONS] [REQUESTFILE]
+
+	Options:
+	  -c, --concurrency INTEGER  How many concurrent requests to send
+	  -r, --repeat INTEGER       How many times to repeat the whole requests
+								 cycle
+	  --help                     Show this message and exit.

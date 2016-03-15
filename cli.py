@@ -32,8 +32,7 @@ from wrkloadr import multirepeater, csvwriter
               help='How many concurrent requests to send')
 @click.option('-r', '--repeat', type=int, default=1,
               help='How many times to repeat the whole requests cycle')
-@click.argument('requestfile', type=click.File('r'), default=sys.stdin,
-                help='Requests cycle configuration json file')
+@click.argument('requestfile', type=click.File('r'), default=sys.stdin)
 def worker(concurrency, repeat, requestfile):
     multirepeater(concurrency, repeat, csvwriter(sys.stdout.write),
                   config.load(requestfile))
@@ -53,15 +52,16 @@ def worker(concurrency, repeat, requestfile):
 @click.option('-q', '--requests', type=click.File('r'),
               help='Requests cycle configuration json file')
 def cluster(provider, instances, concurrency, repeat,
-            output, environments, requests):
+            environments, requests):
     loadr = Loadr()
-    loadr.ui('Csv')
     loadr.providers(config.load(environments))
     loadr.requests(config.load(requests))
-    loadr.start({'provider': provider,
-                   'instances': instances,
-                   'concurrency': concurrency,
-                   'repeat': repeat})
+    loadr.start([{'provider': provider,
+                  'instances': instances,
+                  'concurrency': concurrency,
+                  'repeat': repeat}])
+    loadr.ui('Csv')
+
 
 @click.command()
 @click.option('-s', '--session', type=click.File('r'),
@@ -74,6 +74,7 @@ def cluster(provider, instances, concurrency, repeat,
               help='Which ui to use')
 def main(session, environments, requests, ui):
     loadr = Loadr()
-    loadr.ui(ui)
     loadr.providers(config.load(environments))
     loadr.requests(config.load(requests))
+    loadr.start(config.load(session))
+    loadr.ui(ui)
