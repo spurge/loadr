@@ -31,11 +31,32 @@ class Loadr:
 
         self._ui = None
         self._ui_process = None
-        self._ui_output = mp.Queue()
+        self._ui_input, self._ui_output = mp.Pipe()
 
         self._session = Session(self._session_output)
-        self._session_process = None
+        self._session_processes = []
         self._session_output = mp.Queue()
+
+        self._listener_process = mp.Process(target=self._listener)
+
+    def _listener(self):
+        while True:
+            data = self._ui_output.recv()
+
+            if data[0] == 'command':
+                if data[1]
+                elif data[1] == 'start':
+                    self._create_session_process(self._session.start,
+                                                 **data[2])
+                elif data[1] == 'run':
+                    self._create_session_process(self._session.run,
+                                                 **data[2])
+
+    def _create_session_process(self, method, **kwargs):
+        mp = get_context('fork')
+
+        self._session_processes += [mp.Process(target=method,
+                                               args=kwargs)]
 
     def ui(self, name=None, module=None):
         if name is not None:
@@ -51,12 +72,13 @@ class Loadr:
             self._ui_process = mp.Process(target=self._ui.start)
 
     def requests(self, config):
-        self._session.requests(config)
+        self._ui_input.send(('command', 'start', config))
 
     def providers(self, config):
         self._session.providers(config)
 
     def start(self, config):
-        mp = get_context('fork')
-        self._process_session = mp.Process(target=self._session.start,
-                                           args=(config,))
+        self._ui_input.send(('command', 'start', config))
+
+    def run(self):
+        self._ui_input.send(('command', 'run'))
