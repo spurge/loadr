@@ -141,6 +141,7 @@ pip install requests
 
         for i in self.instances:
             i.wait_until_running()
+            sleep(60)
             self.output.put(('status', i.id, 'running'))
 
     def remove_instances(self, wait=True):
@@ -232,9 +233,10 @@ pip install requests
                 break;
 
             if len(stdout) > 0:
-                lines = stdout.decode('utf-8').split('\n')
+                lines = '{}{}'.format(lastline,
+                                      stdout.decode('utf-8')).split('\n')
 
-                for csv in [lastline] + lines[:-1]:
+                for csv in lines[:-1]:
                     if len(csv) > 0:
                         self.output.put(('data',
                                          instance.id,

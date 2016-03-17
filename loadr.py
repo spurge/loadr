@@ -47,22 +47,16 @@ class Loadr:
 
             if data[0] == 'command':
                 if data[1] == 'providers':
-                    sys.stdout.write('providers')
                     self._session.providers(data[2])
                 elif data[1] == 'requests':
-                    sys.stdout.write('requests')
                     self._session.requests(data[2])
                 elif data[1] == 'start':
-                    sys.stdout.write('start...')
                     self._session.start(data[2])
                 elif data[1] == 'run':
-                    sys.stdout.write('run...')
                     self._session.run()
                 elif data[1] == 'stop':
-                    sys.stdout.write('stop...')
                     self._session.stop()
                 elif data[1] == 'quit':
-                    sys.stdout.write('quit...')
                     self.quit()
 
     def ui(self, name=None, module=None):
@@ -96,5 +90,4 @@ class Loadr:
 
     def quit(self):
         self.stop()
-        self._ui_process.terminate()
-        self._listener_process.terminate()
+        sys.exit(0)
