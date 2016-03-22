@@ -19,6 +19,7 @@ along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 
 import boto3
 import json
+import math
 import paramiko
 import sys
 
@@ -37,13 +38,28 @@ class Awsec2:
     The nested instances-stuff is not implemented yet.
     """
 
-    bootscript = """#!/bin/bash
+    instances_per_messenger = 20
+
+    messengers_bootscript = """#!/bin/bash
+yum update -y
+wget http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
+wget http://rpms.famillecollet.com/enterprise/remi-release-6.rpm
+sudo rpm -Uvh remi-release-6*.rpm epel-release-6*.rpm
+yum install -y erlang
+wget http://www.rabbitmq.com/releases/rabbitmq-server/v3.6.1/rabbitmq-server-3.6.1-1.noarch.rpm
+rpm --import https://www.rabbitmq.com/rabbitmq-signing-key-public.asc
+yum install -y rabbitmq-server-3.6.1-1.noarch.rpm
+chkconfig rabbitmq-server on
+service rabbitmq-server start
+"""
+
+    workers_bootscript = """#!/bin/bash
 yum update -y
 yum install -y python34 python34-pip
 alternatives --set python /usr/bin/python3.4
-pip install requests
+pip install puka requests
 """
-    """Lines of bash that will run when the instances initializes
+    """Lines of bash that will run when the workers instances initializes
     """
 
 
@@ -59,6 +75,7 @@ pip install requests
         self.keypair = self.create_keypair()
         self.securitygroup = self.create_securitygroup()
 
+        self.messengers = []
         self.instances = []
 
     def create_session(self, region, profile=None,
@@ -122,12 +139,23 @@ pip install requests
 
         self.output.put(('status', 'awsec2', 'creating instances'))
 
+        messenger_count = math.ceil(instances / self.instances_per_messenger)
+
+        self.messengers = self.ec2.create_instances(
+                            ImageId='',
+                            InstanceType='',
+                            MinCount=messenger_count,
+                            MaxCount=messenger_count,
+                            UserData=self.messengers_bootscript,
+                            KeyName=self.keypair.name,
+                            SecurityGroupIds=[self.securitygroup.id])
+
         self.instances = self.ec2.create_instances(
                             ImageId=self.image_id,
                             InstanceType=self.instance_type,
                             MinCount=instances,
                             MaxCount=instances,
-                            UserData=self.bootscript,
+                            UserData=self.workers_bootscript,
                             KeyName=self.keypair.name,
                             SecurityGroupIds=[self.securitygroup.id])
 
@@ -139,7 +167,7 @@ pip install requests
         This method must be thread-safe.
         """
 
-        for i in self.instances:
+        for i in self.messengers + self.instances:
             i.wait_until_running()
             sleep(60)
             self.output.put(('status', i.id, 'running'))
@@ -149,7 +177,7 @@ pip install requests
         This method is not thread-safe.
         """
 
-        for i in self.instances:
+        for i in self.messengers + self.instances:
             i.terminate()
 
         if wait:
@@ -160,14 +188,14 @@ pip install requests
         This method must be thread-safe.
         """
 
-        for i in self.instances:
+        for i in self.messengers + self.instances:
             i.wait_until_terminated()
             self.output.put(('status', i.id, 'removed'))
 
         self.instances = []
 
-    def run_single_worker(self, instance, concurrency,
-                          repeat, requests):
+    def run_single_worker(self, instance, messenger,
+                          concurrency, repeat, requests):
         """Creates a ssh connection to specified instance,
         uploads wrkloadr.py and runs it. It will the write all stdout to
         specified writer.
@@ -178,6 +206,8 @@ pip install requests
 
         # Get all the necessary data for the instance,
         # like IP and dns name.
+        messenger.wait_until_running()
+        messenger.load()
         instance.wait_until_running()
         instance.load()
 
@@ -212,49 +242,14 @@ pip install requests
         sftp.put('wrkloadr.py', 'wrkloadr.py')
 
         # Then execute
-        channel = client.get_transport().open_session()
-        channel.exec_command('python wrkloadr.py {} {} \'{}\''.format(
-                                concurrency,
-                                repeat,
-                                json.dumps(requests)))
+        client.exec_command('python wrkloadr.py {} {} {} \'{}\' &'.format(
+                            messenger.private_dns_name,
+                            concurrency,
+                            repeat,
+                            json.dumps(requests)))
         self.output.put(('status', instance.id, 'running command'))
 
-        # We're separating csv data form instances by \n.
-        # Therefor we can't be sure about the last line being complete.
-        # Save last line of csv data and prepend it next batch of lines.
-        lastline = ''
-
-        # Write all stdout from ssh channel to specified writer
-        while True:
-            stdout = channel.recv(1024)
-            stderr = channel.recv_stderr(1024)
-
-            if not stdout and not stderr:
-                break;
-
-            if len(stdout) > 0:
-                lines = '{}{}'.format(lastline,
-                                      stdout.decode('utf-8')).split('\n')
-
-                for csv in lines[:-1]:
-                    if len(csv) > 0:
-                        self.output.put(('data',
-                                         instance.id,
-                                         csv))
-
-                lastline = lines[-1]
-
-            if len(stderr) > 0:
-                self.output.put(('error', instance.id,
-                                 stderr.decode('utf-8')))
-
-        if len(lastline) > 0:
-            self.output.put(('data', instance.id, lastline))
-
-        self.output.put(('status', instance.id, 'ended'))
-
         # Close and quit
-        channel.close()
         client.close()
         keyfile.close()
 
@@ -266,17 +261,23 @@ pip install requests
 
         # Initialize the instance processes
         mp = get_context('fork')
-        processes = [mp.Process(target=self.run_single_worker,
-                                args=(i, concurrency, repeat, requests))
-                     for i in self.instances]
+        concurrent_processes = 10
+        processes = []
 
-        # Start processes
-        for p in processes:
-            p.start()
+        for i, messenger in enumerate(self.messengers):
+            for instance in self.instances[i * self.instances_per_messenger:]:
+                processes.append(mp.Process(target=self.run_single_worker,
+                                            args=(instance, messenger,
+                                                  concurrency, repeat, requests)))
 
-        # Then wait for all processes to end
-        for p in processes:
-            p.join()
+        for i in range(0, concurrent_processes - 1):
+            # Start processes
+            for p in processes[i * concurrent_processes:]:
+                p.start()
+
+            # Then wait for all processes to end
+            for p in processes[i * concurrent_processes:]:
+                p.join()
 
     def shutdown(self):
         """Deletes keys and policies.

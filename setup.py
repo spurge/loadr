@@ -28,6 +28,7 @@ setup(
         'click',
         'gnupg',
         'paramiko',
+        'puka',
         'requests'
     ],
     entry_points='''
