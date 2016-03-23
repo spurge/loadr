@@ -18,6 +18,7 @@ along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import json
+import puka
 import sys
 
 from multiprocessing import Process, Queue
@@ -136,7 +137,7 @@ def singlerepeater(repeat, writer, config):
 def multirepeater(concurrency, repeat, writer, requestconfig):
     config = configdefaults(requestconfig)
     processes = [Process(target=singlerepeater,
-                            args=(repeat, writer, config))
+                         args=(repeat, writer, config))
                  for x in range(concurrency)]
 
     for p in processes:
@@ -147,15 +148,23 @@ def multirepeater(concurrency, repeat, writer, requestconfig):
 
 
 if __name__ == '__main__':
-    import json
-
     if len(sys.argv) < 4:
         sys.stderr.write('Too few arguments. 3 required: concurrency, repeat and requests.')
         sys.exit(2)
 
-    writer = csvwriter(sys.stdout.write)
+    if len(sys.argv) > 4:
+        writer = pukawriter(sys.argv[1])
 
-    multirepeater(int(sys.argv[1]),
-                  int(sys.argv[2]),
-                  writer,
-                  json.loads(sys.argv[3]))
+        # Wait for incoming run call from messenger
+        
+        multirepeater(int(sys.argv[2]),
+                      int(sys.argv[3]),
+                      writer,
+                      json.loads(sys.argv[4]))
+    else:
+        writer = csvwriter(sys.stdout.write)
+
+        multirepeater(int(sys.argv[1]),
+                      int(sys.argv[2]),
+                      writer,
+                      json.loads(sys.argv[3]))

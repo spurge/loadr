@@ -21,6 +21,7 @@ import boto3
 import json
 import math
 import paramiko
+import puka
 import sys
 
 from io import StringIO
@@ -58,6 +59,7 @@ rpm --import https://www.rabbitmq.com/rabbitmq-signing-key-public.asc
 yum install -y rabbitmq-server-3.6.1-1.noarch.rpm
 chkconfig rabbitmq-server on
 service rabbitmq-server start
+# SET PERMISSIONS
 """
 
     workers_bootscript = """#!/bin/bash
@@ -80,7 +82,8 @@ pip install puka requests
         self.session = self.create_session(**kwargs)
         self.ec2 = self.session.resource('ec2')
         self.keypair = self.create_keypair()
-        self.securitygroup = self.create_securitygroup()
+        self.messengers_securitygroup = self.create_messengers_securitygroup()
+        self.workers_securitygroup = self.create_workers_securitygroup()
 
         self.messengers = []
         self.instances = []
@@ -110,11 +113,40 @@ pip install puka requests
         keypair.delete()
         return self.ec2.create_key_pair(KeyName=keyname)
 
-    def create_securitygroup(self):
+    def create_messengers_securitygroup(self):
+        """Creates a security policy which makes rabbitmq reachable
+        """
+
+        sgname = 'loadr-messenger-%s' % random_string()
+        sg = None
+
+        # Look for existing security group
+        for vpc in self.ec2.vpcs.all():
+            if sg is not None:
+                break
+
+            for group in vpc.security_groups.all():
+                if group.group_name == sgname:
+                    sg = group
+                    break
+
+        # Create one if non-existent
+        if sg is None:
+            sg = self.ec2.create_security_group(GroupName=sgname,
+                                                Description='loadr rabbitmq messenger access')
+            sg.authorize_ingress(IpProtocol='tcp',
+                                 CidrIp='0.0.0.0/0',
+                                 FromPort=5672,
+                                 ToPort=5672)
+
+        return sg
+
+
+    def create_workers_securitygroup(self):
         """Creates a security policy which makes a ssh access possible
         """
 
-        sgname = 'loadr-%s' % random_string()
+        sgname = 'loadr-worker-%s' % random_string()
         sg = None
 
         # Look for existing security group
@@ -279,6 +311,12 @@ pip install puka requests
             # Then wait for all processes to end
             for p in processes[i * self.concurrent_ssh_sessions:]:
                 p.join()
+
+        # Collect and redirect data
+        for messenger in self.messengers:
+            # Send a run messege to all messengers
+            # Start receiving data from all messengers
+            pass
 
     def shutdown(self):
         """Deletes keys and policies.
