@@ -39,7 +39,14 @@ class Awsec2:
     """
 
     instances_per_messenger = 20
+    concurrent_ssh_sessions = 10
+    ssh_retries = 10
+    ssh_retry_timeout = 10
+    ssh_timeout = 60
+    bootscript_wait_timeout = 60
 
+    messengers_image_id = 'ami-e2df388d'
+    messengers_type = 't2.medium'
     messengers_bootscript = """#!/bin/bash
 yum update -y
 wget http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
@@ -142,13 +149,11 @@ pip install puka requests
         messenger_count = math.ceil(instances / self.instances_per_messenger)
 
         self.messengers = self.ec2.create_instances(
-                            ImageId='',
-                            InstanceType='',
+                            ImageId=self.messenger_image_id,
+                            InstanceType=self.messenger_type,
                             MinCount=messenger_count,
                             MaxCount=messenger_count,
-                            UserData=self.messengers_bootscript,
-                            KeyName=self.keypair.name,
-                            SecurityGroupIds=[self.securitygroup.id])
+                            UserData=self.messengers_bootscript)
 
         self.instances = self.ec2.create_instances(
                             ImageId=self.image_id,
@@ -169,7 +174,7 @@ pip install puka requests
 
         for i in self.messengers + self.instances:
             i.wait_until_running()
-            sleep(60)
+            sleep(self.bootscript_timeout)
             self.output.put(('status', i.id, 'running'))
 
     def remove_instances(self, wait=True):
@@ -217,20 +222,17 @@ pip install puka requests
         keyfile = StringIO(self.keypair.key_material)
         key = paramiko.RSAKey.from_private_key(keyfile)
 
-        # Number of retries
-        retries = 10
-
         # Retry loop
-        for r in range(retries):
+        for r in range(self.ssh_retries):
             # It will take at least 60 seconds before the server is responding
-            sleep(60)
+            sleep(self.ssh_retry_timeout)
 
             try:
                 client.connect(instance.public_dns_name,
                                username='ec2-user',
                                pkey=key,
                                look_for_keys=False,
-                               timeout=60)
+                               timeout=self.ssh_timeout)
                 self.output.put(('status', instance.id, 'connected'))
                 break
             except:
@@ -242,7 +244,7 @@ pip install puka requests
         sftp.put('wrkloadr.py', 'wrkloadr.py')
 
         # Then execute
-        client.exec_command('python wrkloadr.py {} {} {} \'{}\' &'.format(
+        client.exec_command('sh -c "python wrkloadr.py \'{}\' {} {} \'{}\' & echo $!"'.format(
                             messenger.private_dns_name,
                             concurrency,
                             repeat,
@@ -261,7 +263,6 @@ pip install puka requests
 
         # Initialize the instance processes
         mp = get_context('fork')
-        concurrent_processes = 10
         processes = []
 
         for i, messenger in enumerate(self.messengers):
@@ -270,13 +271,13 @@ pip install puka requests
                                             args=(instance, messenger,
                                                   concurrency, repeat, requests)))
 
-        for i in range(0, concurrent_processes - 1):
+        for i in range(0, self.concurrent_ssh_sessions - 1):
             # Start processes
-            for p in processes[i * concurrent_processes:]:
+            for p in processes[i * self.concurrent_ssh_sessions:]:
                 p.start()
 
             # Then wait for all processes to end
-            for p in processes[i * concurrent_processes:]:
+            for p in processes[i * self.concurrent_ssh_sessions:]:
                 p.join()
 
     def shutdown(self):
