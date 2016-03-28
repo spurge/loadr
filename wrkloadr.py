@@ -43,7 +43,6 @@ class RabbitWriter:
 
     def __init__(self, url):
         parameters = pika.URLParameters(url)
-        print(parameters)
         self.connection = pika.BlockingConnection(parameters)
         self.channel = connection.channel()
 

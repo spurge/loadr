@@ -141,7 +141,7 @@ class TestWrkloadr(TestCase):
     def test_rabbitwriter(self):
         client = docker.Client(base_url='unix://var/run/docker.sock')
         container = client.create_container(image='rabbitmq:3',
-                                            environment={'RABBITMQ_DEFAULT_VHOST':'/'},
+                                            environment={'RABBITMQ_':'/'},
                                             ports=[5672],
                                             host_config=client.create_host_config(port_bindings={'5672':5672}))
         cid = container.get('Id')
