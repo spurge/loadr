@@ -64,7 +64,7 @@ service rabbitmq-server start
 yum update -y
 yum install -y python34 python34-pip
 alternatives --set python /usr/bin/python3.4
-pip install puka requests
+pip install pika requests
 """
     """Lines of bash that will run when the workers instances initializes
     """

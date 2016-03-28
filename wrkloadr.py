@@ -18,12 +18,44 @@ along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import json
+import pika
 import sys
 
 from multiprocessing import Process, Queue
 from requests import Request, Session, ConnectionError
 from re import finditer
 from time import time
+
+
+class CsvWriter:
+
+    def __init__(self, stream):
+        self.stream = stream
+
+    def write(self, *data):
+        self.stream.write(','.join([str(v) for v in data]) + '\n')
+
+    def close(self):
+        pass
+
+
+class RabbitWriter:
+
+    def __init__(self, url):
+        parameters = pika.URLParameters(url)
+        print(parameters)
+        self.connection = pika.BlockingConnection(parameters)
+        self.channel = connection.channel()
+
+    def write(self, *data):
+        channel.basic_publish('loadr',
+                              'data',
+                              ','.join([str(v) for v in data]),
+                              pika.BasicProperties(content_type='text/plain',
+                                                   delivery_mode=1))
+
+    def close(self):
+        self.connection.close()
 
 
 def millisec():
@@ -82,13 +114,6 @@ def parseconfig(data, history):
     return data
 
 
-def csvwriter(output, *xtra):
-    def writer(*data):
-        output(','.join([str(v) for v in data + xtra]) + '\n')
-
-    return writer
-
-
 def send(config, sess, history):
     config = parseconfig(config, history)
     req = Request(config['method'],
@@ -100,6 +125,8 @@ def send(config, sess, history):
 
 
 def singlerepeater(repeat, writer, config):
+    out = writer[0](*writer[1:])
+
     for ci in range(0, repeat):
         sess = Session()
         history = {}
@@ -118,12 +145,12 @@ def singlerepeater(repeat, writer, config):
 
                 endtime = millisec()
 
-                writer(ci,
-                       ri,
-                       rri,
-                       status,
-                       starttime,
-                       endtime)
+                out.write(ci,
+                          ri,
+                          rri,
+                          status,
+                          starttime,
+                          endtime)
 
                 ri += 1
 
@@ -132,11 +159,13 @@ def singlerepeater(repeat, writer, config):
 
         sess.close()
 
+    out.close()
+
 
 def multirepeater(concurrency, repeat, writer, requestconfig):
     config = configdefaults(requestconfig)
     processes = [Process(target=singlerepeater,
-                            args=(repeat, writer, config))
+                         args=(repeat, writer, config))
                  for x in range(concurrency)]
 
     for p in processes:
@@ -147,15 +176,19 @@ def multirepeater(concurrency, repeat, writer, requestconfig):
 
 
 if __name__ == '__main__':
-    import json
-
     if len(sys.argv) < 4:
         sys.stderr.write('Too few arguments. 3 required: concurrency, repeat and requests.')
         sys.exit(2)
 
-    writer = csvwriter(sys.stdout.write)
-
-    multirepeater(int(sys.argv[1]),
-                  int(sys.argv[2]),
-                  writer,
-                  json.loads(sys.argv[3]))
+    if len(sys.argv) > 4:
+        # Arguments: rabbitmq url, concurrency, repeat and requests file
+        multirepeater(int(sys.argv[2]),
+                      int(sys.argv[3]),
+                      (RabbitWriter, sys.argv[1]),
+                      json.loads(sys.argv[4]))
+    else:
+        # Arguments: concurrency, repeat and requests file
+        multirepeater(int(sys.argv[1]),
+                      int(sys.argv[2]),
+                      (CsvWriter, sys.stdout.write),
+                      json.loads(sys.argv[3]))
