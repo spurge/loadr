@@ -44,14 +44,17 @@ class RabbitWriter:
     def __init__(self, url):
         parameters = pika.URLParameters(url)
         self.connection = pika.BlockingConnection(parameters)
-        self.channel = connection.channel()
+        self.channel = self.connection.channel()
+        self.channel.queue_declare(queue='loadr',
+                                   durable=False,
+                                   exclusive=False)
 
     def write(self, *data):
-        channel.basic_publish('loadr',
-                              'data',
-                              ','.join([str(v) for v in data]),
-                              pika.BasicProperties(content_type='text/plain',
-                                                   delivery_mode=1))
+        self.channel.basic_publish(exchange='',
+                                   routing_key='loadr-data',
+                                   body=','.join([str(v) for v in data]),
+                                   properties=pika.BasicProperties(content_type='text/plain',
+                                                                   delivery_mode=1))
 
     def close(self):
         self.connection.close()
