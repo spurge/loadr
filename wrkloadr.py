@@ -24,13 +24,16 @@ import sys
 from multiprocessing import Process, Queue
 from requests import Request, Session, ConnectionError
 from re import finditer
-from time import time
+from time import time, sleep
 
 
 class CsvWriter:
 
     def __init__(self, stream):
         self.stream = stream
+
+    def wait(self):
+        pass
 
     def write(self, *data):
         self.stream.write(','.join([str(v) for v in data]) + '\n')
@@ -45,16 +48,30 @@ class RabbitWriter:
         parameters = pika.URLParameters(url)
         self.connection = pika.BlockingConnection(parameters)
         self.channel = self.connection.channel()
-        self.channel.queue_declare(queue='loadr',
-                                   durable=False,
-                                   exclusive=False)
+        self.channel.queue_declare(queue='loadr-data',
+                                   durable=False)
+
+    def wait(self):
+        while True:
+            method_frame, properties, body = self.channel.basic_get(queue='loadr-signal')
+
+            if body is not None:
+                break
+
+            sleep(1)
+
+        self.channel.basic_ack(method_frame.delivery_tag)
+        timeout = int(body) - round(millisec() / 1000)
+
+        if timeout > 0:
+            sleep(timeout)
 
     def write(self, *data):
+        properties = pika.BasicProperties(content_type='text/plain')
         self.channel.basic_publish(exchange='',
                                    routing_key='loadr-data',
                                    body=','.join([str(v) for v in data]),
-                                   properties=pika.BasicProperties(content_type='text/plain',
-                                                                   delivery_mode=1))
+                                   properties=properties)
 
     def close(self):
         self.connection.close()

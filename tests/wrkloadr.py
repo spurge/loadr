@@ -19,6 +19,7 @@ along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 
 import docker
 import json
+import pika
 import sys
 
 from io import StringIO
@@ -133,6 +134,7 @@ class TestWrkloadr(TestCase):
         stream = StringIO()
 
         csv = wrkloadr.CsvWriter(stream)
+        csv.wait()
         csv.write(*range(3))
         csv.close()
 
@@ -140,17 +142,37 @@ class TestWrkloadr(TestCase):
 
     def test_rabbitwriter(self):
         client = docker.Client(base_url='unix://var/run/docker.sock')
+        hostconfig = client.create_host_config(port_bindings={'5672':5672})
         container = client.create_container(image='rabbitmq:3',
                                             ports=[5672],
-                                            host_config=client.create_host_config(port_bindings={'5672':5672}))
+                                            host_config=hostconfig)
         cid = container.get('Id')
         client.start(container=cid)
         sleep(10)
 
+        url = 'amqp://localhost:5672/%2F'
+
         try:
-            rabbit = wrkloadr.RabbitWriter('amqp://guest:guest@localhost:5672/%2F')
+            parameters = pika.URLParameters(url)
+            connection = pika.BlockingConnection(parameters)
+            channel = connection.channel()
+            channel.queue_declare(queue='loadr-signal',
+                                  durable=False)
+            properties = pika.BasicProperties(content_type='text/plain')
+            channel.basic_publish(exchange='',
+                                  routing_key='loadr-signal',
+                                  body=str(round(wrkloadr.millisec() / 1000) + 2))
+
+            rabbit = wrkloadr.RabbitWriter(url)
+            rabbit.wait()
             rabbit.write(*range(3))
             rabbit.close()
+
+            method_frame, properties, body = channel.basic_get(queue='loadr-data')
+
+            self.assertEqual(body.decode(), '0,1,2')
+
+            connection.close()
         finally:
             client.stop(container=cid)
             client.remove_container(container=cid)
