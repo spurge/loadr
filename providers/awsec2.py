@@ -21,7 +21,7 @@ import boto3
 import json
 import math
 import paramiko
-import puka
+import pika
 import sys
 
 from io import StringIO
@@ -48,6 +48,8 @@ class Awsec2:
 
     messengers_image_id = 'ami-e2df388d'
     messengers_type = 't2.medium'
+    messengers_username = ''
+    messengers_password = ''
     messengers_bootscript = """#!/bin/bash
 yum update -y
 wget http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
@@ -59,7 +61,8 @@ rpm --import https://www.rabbitmq.com/rabbitmq-signing-key-public.asc
 yum install -y rabbitmq-server-3.6.1-1.noarch.rpm
 chkconfig rabbitmq-server on
 service rabbitmq-server start
-# SET PERMISSIONS
+rabbitmqctl add_user {username} {password}
+rabbitmqsql set_permissions {username} ".*" ".*" ".*"
 """
 
     workers_bootscript = """#!/bin/bash
@@ -84,6 +87,9 @@ pip install pika requests
         self.keypair = self.create_keypair()
         self.messengers_securitygroup = self.create_messengers_securitygroup()
         self.workers_securitygroup = self.create_workers_securitygroup()
+
+        self.messengers_username = random_string(32)
+        self.messengers_password = random_string(32)
 
         self.messengers = []
         self.instances = []
@@ -185,7 +191,9 @@ pip install pika requests
                             InstanceType=self.messenger_type,
                             MinCount=messenger_count,
                             MaxCount=messenger_count,
-                            UserData=self.messengers_bootscript)
+                            UserData=self.messengers_bootscript.format(
+                                username=self.messengers_username,
+                                password=self.messengers_password))
 
         self.instances = self.ec2.create_instances(
                             ImageId=self.image_id,
@@ -276,8 +284,10 @@ pip install pika requests
         sftp.put('wrkloadr.py', 'wrkloadr.py')
 
         # Then execute
-        client.exec_command('sh -c "python wrkloadr.py \'{}\' {} {} \'{}\' & echo $!"'.format(
-                            messenger.private_dns_name,
+        client.exec_command('sh -c "python wrkloadr.py \'amqp://{}:{}@{}:5672\' {} {} \'{}\' & echo $!"'.format(
+                            self.messenger_username,
+                            self.messenger_password,
+                            messenger.public_dns_name,
                             concurrency,
                             repeat,
                             json.dumps(requests)))

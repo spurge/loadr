@@ -47,6 +47,9 @@ class TestWriter:
         self.test = test
         self.lines = lines
 
+    def wait(self):
+        pass
+
     def write(self, *args):
         self.lines.value += 1
         self.test.assertEqual(len(args), 6)

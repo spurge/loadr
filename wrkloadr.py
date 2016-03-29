@@ -145,6 +145,7 @@ def send(config, sess, history):
 
 def singlerepeater(repeat, writer, config):
     out = writer[0](*writer[1:])
+    out.wait()
 
     for ci in range(0, repeat):
         sess = Session()
