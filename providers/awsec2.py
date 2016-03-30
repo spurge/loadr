@@ -26,7 +26,7 @@ import sys
 
 from io import StringIO
 from multiprocessing import get_context, Queue
-from time import sleep
+from time import time, sleep
 
 from util import random_string
 
@@ -93,6 +93,12 @@ pip install pika requests
 
         self.messengers = []
         self.instances = []
+
+    def get_messenger_url(self, messenger):
+        return 'amqp://{}:{}@{}:5672'.format(
+            self.messenger_username,
+            self.messenger_password,
+            messenger.public_dns_name)
 
     def create_session(self, region, profile=None,
                        access_key=None, secret_key=None):
@@ -284,20 +290,18 @@ pip install pika requests
         sftp.put('wrkloadr.py', 'wrkloadr.py')
 
         # Then execute
-        client.exec_command('sh -c "python wrkloadr.py \'amqp://{}:{}@{}:5672\' {} {} \'{}\' & echo $!"'.format(
-                            self.messenger_username,
-                            self.messenger_password,
-                            messenger.public_dns_name,
-                            concurrency,
-                            repeat,
-                            json.dumps(requests)))
+        client.exec_command('sh -c "python wrkloadr.py \'{}\' {} {} \'{}\' & echo $!"'.format(
+            self.get_messenger_url(messenger),
+            concurrency,
+            repeat,
+            json.dumps(requests)))
         self.output.put(('status', instance.id, 'running command'))
 
         # Close and quit
         client.close()
         keyfile.close()
 
-    def run_multiple_workers(self, concurrency, repeat, requests):
+    def run_multiple_workers(self, concurrency, repeat, requests, starttime):
         """Runs multiple workers on each instance.
         Each worker within its own thread.
         Used run_single_worker method.
@@ -322,11 +326,21 @@ pip install pika requests
             for p in processes[i * self.concurrent_ssh_sessions:]:
                 p.join()
 
+        # Define a start time
+        starttime = int(round(time() + 10))
+
+        brokers = []
+
         # Collect and redirect data
         for messenger in self.messengers:
             # Send a run messege to all messengers
-            # Start receiving data from all messengers
-            pass
+            # and start receiving data from all messengers
+            brokers.append(Messenger(self.get_messenger_url(messenger),
+                                     starttime,
+                                     self.output))
+
+        for messenger in brokers:
+            messenger.wait()
 
     def shutdown(self):
         """Deletes keys and policies.
