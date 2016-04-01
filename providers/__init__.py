@@ -20,6 +20,8 @@ along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 import asyncio
 import pika
 
+from time import time
+
 
 def get_provider(name, output, **config):
     try:
@@ -35,56 +37,51 @@ def get_provider(name, output, **config):
 
 class Messenger:
 
+    timeout = 60
+    last_fetched_time = 0
+
     def __init__(self, url, starttime, output):
+        self.url = url
+        self.last_fetched_time = starttime
         self.starttime = starttime
         self.output = output
 
-        parameters = pika.URLParameters(url)
+    @asyncio.coroutine
+    def connect(self):
+        parameters = pika.URLParameters(self.url)
+        self.connection = pika.BlockingConnection(parameters)
+        self.channel = self.connection.channel()
 
-        self.connection = pika.SelectConnection(
-            parameters=parameters,
-            on_open_callback=self._on_connection_open,
-            on_error_callback=self._on_connection_error,
-            on_close_callback=self._on_connection_close)
+        self.channel.queue_declare(queue='loadr-signal')
+        self.channel.queue_declare(queue='loadr-data')
 
-    def _on_connection_open(self, connection):
-        self._open_channel()
-
-    def _on_connection_error(self, connection):
-        pass
-
-    def _on_connection_close(self, connection):
-        pass
-
-    def _on_channel_open(self, channel):
-        self._declare_queue()
-
-    def _on_queue_declared(self, channel):
-        self._send_starttime()
-        self._start_consume()
-
-    def _on_message(self, channel, method, properties, body):
-        self.output.put('data', 'messenger', body.decode())
-
-    def _open_channel(self):
-        self.channel = self.connection.channel(
-            on_open_callback=self._on_channel_open)
-
-    def _declare_queue(self):
-        self.channel.declare_queue(
-            callback=self._on_queue_declared,
-            queue='loadr-signal')
-
-    def _start_consume(self):
-        self.channel.basic_consume(
-            consumer_callback=self._on_message,
-            queue='loadr-data')
+        self.channel.basic_publish(exchange='',
+                                   routing_key='loadr-signal',
+                                   body=str(self.starttime))
 
     @asyncio.coroutine
-    def _wait(self):
+    def listen(self):
         while True:
+            try:
+                m, p, b = self.channel.basic_get(queue='loadr-data')
+
+                if b is not None:
+                    self.last_fetched_time = time()
+                    self.output.put(('data', 'messenger', b.decode()))
+                    self.channel.basic_ack(m.delivery_tag)
+            except:
+                pass
+
+            if self.last_fetched_time + self.timeout < time():
+                break
+
             yield from asyncio.sleep(1)
+
+    @asyncio.coroutine
+    def start(self):
+        return asyncio.wait([self.connect(),
+                             self.listen()])
 
     def wait(self):
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(self._wait())
+        loop.run_until_complete(self.start())

@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import asyncio
 import boto3
 import json
 import math
@@ -329,18 +330,20 @@ pip install pika requests
         # Define a start time
         starttime = int(round(time() + 10))
 
-        brokers = []
+        waiters = []
 
         # Collect and redirect data
         for messenger in self.messengers:
             # Send a run messege to all messengers
             # and start receiving data from all messengers
-            brokers.append(Messenger(self.get_messenger_url(messenger),
-                                     starttime,
-                                     self.output))
+            broker = Messenger(self.get_messenger_url(messenger),
+                               starttime,
+                               self.output)
+            waiters.append(broker.connect())
+            waiters.append(broker.listen())
 
-        for messenger in brokers:
-            messenger.wait()
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(asyncio.wait(waiters))
 
     def shutdown(self):
         """Deletes keys and policies.
