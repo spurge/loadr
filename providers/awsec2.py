@@ -30,6 +30,7 @@ from multiprocessing import get_context, Queue
 from time import time, sleep
 
 from util import random_string
+from providers import Messenger
 
 
 class Awsec2:
@@ -97,8 +98,8 @@ pip install pika requests
 
     def get_messenger_url(self, messenger):
         return 'amqp://{}:{}@{}:5672'.format(
-            self.messenger_username,
-            self.messenger_password,
+            self.messengers_username,
+            self.messengers_password,
             messenger.public_dns_name)
 
     def create_session(self, region, profile=None,
@@ -191,16 +192,17 @@ pip install pika requests
 
         self.output.put(('status', 'awsec2', 'creating instances'))
 
-        messenger_count = math.ceil(instances / self.instances_per_messenger)
+        messengers_count = math.ceil(instances / self.instances_per_messenger)
 
         self.messengers = self.ec2.create_instances(
-                            ImageId=self.messenger_image_id,
-                            InstanceType=self.messenger_type,
-                            MinCount=messenger_count,
-                            MaxCount=messenger_count,
+                            ImageId=self.messengers_image_id,
+                            InstanceType=self.messengers_type,
+                            MinCount=messengers_count,
+                            MaxCount=messengers_count,
                             UserData=self.messengers_bootscript.format(
                                 username=self.messengers_username,
-                                password=self.messengers_password))
+                                password=self.messengers_password),
+                            SecurityGroupIds=[self.messengers_securitygroup.id])
 
         self.instances = self.ec2.create_instances(
                             ImageId=self.image_id,
@@ -209,7 +211,7 @@ pip install pika requests
                             MaxCount=instances,
                             UserData=self.workers_bootscript,
                             KeyName=self.keypair.name,
-                            SecurityGroupIds=[self.securitygroup.id])
+                            SecurityGroupIds=[self.workers_securitygroup.id])
 
         if wait:
             self.wait_for_running_instances()
@@ -221,7 +223,7 @@ pip install pika requests
 
         for i in self.messengers + self.instances:
             i.wait_until_running()
-            sleep(self.bootscript_timeout)
+            sleep(self.bootscript_wait_timeout)
             self.output.put(('status', i.id, 'running'))
 
     def remove_instances(self, wait=True):
@@ -353,6 +355,11 @@ pip install pika requests
             self.keypair.delete()
             self.keypair = None
 
-        if self.securitygroup is not None:
-            self.securitygroup.delete()
-            self.securitygroup = None
+        if self.workers_securitygroup is not None:
+            self.workers_securitygroup.delete()
+            self.workers_securitygroup = None
+
+
+        if self.messengers_securitygroup is not None:
+            self.messengers_securitygroup.delete()
+            self.messengers_securitygroup = None
