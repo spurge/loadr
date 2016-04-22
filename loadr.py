@@ -27,22 +27,44 @@ from clustrloadr import Session
 
 
 class Loadr:
+    """This is the main wrapper. It contains an UI and a Session which
+    communicate through a this object with a Queue and a Pipe.
+
+    The UI has a Pipe which it uses to call this object's commands.
+    These commands calls methods in the Session object.
+
+    The Session has a Queue which it adds it's output data into. The UI object
+    subscribes on the Session's Queue.
+
+    The UI runs in it's own thread.
+    The Session is thread-safe - so we'll have a listener thread that
+    listens for commands from the UI and then invokes the Session.
+    """
 
     def __init__(self):
         mp = get_context('fork')
 
+        # UI empty properties
         self._ui = None
         self._ui_process = None
         self._ui_input, self._ui_output = mp.Pipe()
 
+        # Session creation and it's output Queue
         self._session_output = mp.Queue()
         self._session = Session(self._session_output)
 
+        # Listener thread which listens for UI commands
         self._listener_process = mp.Process(target=self._listener)
         self._listener_process.start()
 
     def _listener(self):
+        """Runs in it's own thread. Listens for commands through the UI's
+        Pipe and calls the Session accordingly.
+        """
+
         while True:
+            # Data comes as three item lont tuple:
+            # (TYPE, COMMAND, ARGUMENT)
             data = self._ui_output.recv()
 
             if data[0] == 'command':
@@ -60,34 +82,58 @@ class Loadr:
                     self.quit()
 
     def ui(self, name=None, module=None):
+        """Sets the UI by name or module and starts it within it's own thread.
+        """
+
         if name is not None:
+            # UI module was passed by name
             self._ui = ui.get_ui(name,
                                  input=self._session_output,
                                  output=self._ui_input)
         elif module is not None:
+            # UI module was passed itself
             self._ui = module(input=self._session_output,
                               output=self._output)
 
         if self._ui is not None:
+            # If UI was found - start it within it's thread
             mp = get_context('fork')
             self._ui_process = mp.Process(target=self._ui.start)
             self._ui_process.start()
 
     def requests(self, config):
+        """Define Session's request configuration.
+        """
+
         self._ui_input.send(('command', 'requests', config))
 
     def providers(self, config):
+        """Define Session's providers by config.
+        """
+
         self._ui_input.send(('command', 'providers', config))
 
     def start(self, config):
+        """Start Session - starts all instances.
+        """
+
         self._ui_input.send(('command', 'start', config))
 
     def stop(self):
+        """Stop Session - stops all instances.
+        """
+
         self._ui_input.send(('command', 'stop'))
 
     def run(self):
+        """Run Session - runs all workers at all instances.
+        """
+
         self._ui_input.send(('command', 'run'))
 
     def quit(self):
+        """Send the stop command and quits current processes.
+        """
+
         self.stop()
         sys.exit(0)
