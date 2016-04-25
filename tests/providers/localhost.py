@@ -22,6 +22,7 @@ import sys
 
 from io import StringIO
 from multiprocessing import Process, Queue
+from time import time
 
 from clustrloadr import Session
 from providers.localhost import Localhost
@@ -48,10 +49,13 @@ class TestLocalhost(unittest.TestCase):
         self.provider.wait_for_running_instances()
         self.assertEqual(len(self.provider.instances), 1)
 
+        starttime = time() + 10
+
         self.provider.run_multiple_workers(concurrency=2,
                                            repeat=3,
                                            requests=[{'method': 'get',
-                                                      'url': 'https://google.com?q=loadr'}])
+                                                      'url': 'https://google.com?q=loadr'}],
+                                           starttime=starttime)
 
         stdout = []
         stderr = ''

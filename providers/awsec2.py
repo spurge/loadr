@@ -64,17 +64,15 @@ class Awsec2:
     # RabbitMQ bootstrap script. Installs RabbitMQ and starts it.
     messengers_bootscript = """#!/bin/bash
 yum update -y
-wget http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
-wget http://rpms.famillecollet.com/enterprise/remi-release-6.rpm
-sudo rpm -Uvh remi-release-6*.rpm epel-release-6*.rpm
-yum install -y erlang
+wget http://www.rabbitmq.com/releases/erlang/erlang-18.3-1.el6.x86_64.rpm
+yum install -y erlang-18.3-1.el6.x86_64.rpm
 wget http://www.rabbitmq.com/releases/rabbitmq-server/v3.6.1/rabbitmq-server-3.6.1-1.noarch.rpm
 rpm --import https://www.rabbitmq.com/rabbitmq-signing-key-public.asc
 yum install -y rabbitmq-server-3.6.1-1.noarch.rpm
 chkconfig rabbitmq-server on
 service rabbitmq-server start
 rabbitmqctl add_user {username} {password}
-rabbitmqsql set_permissions {username} ".*" ".*" ".*"
+rabbitmqctl set_permissions {username} ".*" ".*" ".*"
 """
 
     # Worker bootstrap script. Installs python 3.4 with pika and requests modules
@@ -98,8 +96,8 @@ pip install pika requests
         self.messengers_securitygroup = self.create_messengers_securitygroup()
         self.workers_securitygroup = self.create_workers_securitygroup()
 
-        self.messengers_username = random_string(32)
-        self.messengers_password = random_string(32)
+        self.messengers_username = random_string(16)
+        self.messengers_password = random_string(16)
 
         self.messengers = []
         self.instances = []
@@ -109,10 +107,12 @@ pip install pika requests
         and public dns name.
         """
 
-        return 'amqp://{}:{}@{}:5672'.format(
+        url = 'amqp://{}:{}@{}:5672/%2F'.format(
             self.messengers_username,
             self.messengers_password,
             messenger.public_dns_name)
+        print(url + "\n")
+        return url
 
     def create_session(self, region, profile=None,
                        access_key=None, secret_key=None):
@@ -345,12 +345,20 @@ pip install pika requests
                 p.join()
 
         # Define a start time
-        starttime = int(round(time() + 10))
+        starttime = int(round(time() + 70))
+        sleep(60)
 
         waiters = []
 
         # Collect and redirect data
         for messenger in self.messengers:
+            # Get all the necessary data for the instance,
+            # like IP and dns name.
+            # Even if this was done in run_single_repeater - it was done in
+            # another thread, and the data isn't accessable here.
+            messenger.wait_until_running()
+            messenger.load()
+
             # Send a run messege to all messengers
             # and start receiving data from all messengers
             broker = Messenger(self.get_messenger_url(messenger),
