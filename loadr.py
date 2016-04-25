@@ -39,6 +39,24 @@ class Loadr:
     The UI runs in it's own thread.
     The Session is thread-safe - so we'll have a listener thread that
     listens for commands from the UI and then invokes the Session.
+
+    +-------+ ('command', <command>, <arguments>) +----+
+    | Loadr <-------------------------------------+ UI |
+    +-------+                                     +----+
+       |
+       |    +---------+
+       +----> Session |
+            +----------------------------+
+            | providers(<provider-dict>) |
+            +----------------------------+
+            | requests(<request-list>)   |
+            +----------------------------+
+            | start(<session-dict>)      |
+            +----------------------------+
+            | run()                      |
+            +----------------------------+
+            | stop()                     |
+            +----------------------------+
     """
 
     def __init__(self):

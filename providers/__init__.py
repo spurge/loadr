@@ -22,8 +22,21 @@ import pika
 
 from time import time
 
+"""
+This file contains a collection of utilities that helps provider creation and
+work.
+
+    - get_provider() creates provider object by specified type.
+    - Messenger is a RabbitMQ-messenger bridge that connects the provider with
+      running instances.
+"""
+
 
 def get_provider(name, output, **config):
+    """Creates provider by type and initiate it with specified config
+    arguments. Raises ValueError if specified provider doesn't exists.
+    """
+
     try:
         exec('from providers.{1} import {0}'
              .format(name, name.lower()))
@@ -36,11 +49,36 @@ def get_provider(name, output, **config):
 
 
 class Messenger:
+    """Messenger bridge between provider and it's running instances.
+    It's asynchronous and based on RabbitMQ with the pika module.
 
+    When initiated, it requires a starttime. This starttime is sent to the
+    RabbitMQ server and will be recieved by the instances as a start-signal for
+    a synchronized start.
+
+    Using it async:
+        m = Messenger("RabbitMQ-url", time(), Queue())
+        await m.connect() # Connects to RabbitMQ and sends start-signal
+        await m.listen() # Listens for incoming data and appends it to Queue
+                         # Ends then data ends.
+
+    Using it synchronized:
+        m = Messenger("RabbitMQ-url", time(), Queue())
+        m.wait() # Both connecting and listen. Blocks until incoming data ends.
+    """
+
+    # Stop fetching data after timeout from last success.
     timeout = 60
+    # When was the last time we got any data.
     last_fetched_time = 0
 
     def __init__(self, url, starttime, output):
+        """
+            url = RabbitMQ-url
+            starttime = When to start the instances requests, unix timestamp
+            output = Queue
+        """
+
         self.url = url
         self.last_fetched_time = starttime
         self.starttime = starttime
@@ -48,6 +86,10 @@ class Messenger:
 
     @asyncio.coroutine
     def connect(self):
+        """Asynchronous connection and signal-sender.
+        Connects to RabbitMQ-url and sends a start-signal.
+        """
+
         parameters = pika.URLParameters(self.url)
         self.connection = pika.BlockingConnection(parameters)
         self.channel = self.connection.channel()
@@ -61,6 +103,10 @@ class Messenger:
 
     @asyncio.coroutine
     def listen(self):
+        """Asynchronous listens for incoming data.
+        When data hasn't been seen since specified timeout - it ends.
+        """
+
         while True:
             try:
                 m, p, b = self.channel.basic_get(queue='loadr-data')
@@ -79,9 +125,15 @@ class Messenger:
 
     @asyncio.coroutine
     def start(self):
+        """Async waiter for connect and listen methods.
+        """
+
         return asyncio.wait([self.connect(),
                              self.listen()])
 
     def wait(self):
+        """Synchronized wrapper for start().
+        """
+
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.start())

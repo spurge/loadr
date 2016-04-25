@@ -27,7 +27,21 @@ from re import finditer
 from time import time, sleep
 
 
+"""
+This is the worker-script that sends requests to specified host by the
+request-configuration.
+
+It'll be uploaded to the worker instances, it has hos to work a stand-alone
+executable and it must be able to work as a module for testing.
+
+This file contains output writers, a collection of functions to get the
+request-sending possible and a executable-routine.
+"""
+
+
 class CsvWriter:
+    """An output writer that writes data to stream as csv.
+    """
 
     def __init__(self, stream):
         self.stream = stream
@@ -43,8 +57,16 @@ class CsvWriter:
 
 
 class RabbitWriter:
+    """An output writer that sends data to a RabbitMQ server.
+    This is the writer to use when running on a remote instance.
+    It'll use the wait method by waiting for a start-signal from the RabbitMQ
+    server.
+    """
 
     def __init__(self, url):
+        """Connects to RabbitMQ.
+        """
+
         parameters = pika.URLParameters(url)
         self.connection = pika.BlockingConnection(parameters)
         self.channel = self.connection.channel()
@@ -52,6 +74,9 @@ class RabbitWriter:
                                    durable=False)
 
     def wait(self):
+        """Wait until there's a start-signal from RabbitMQ server.
+        """
+
         while True:
             method_frame, properties, body = self.channel.basic_get(queue='loadr-signal')
 
@@ -67,6 +92,9 @@ class RabbitWriter:
             sleep(timeout)
 
     def write(self, *data):
+        """Send data to RabbitMQ.
+        """
+
         properties = pika.BasicProperties(content_type='text/plain')
         self.channel.basic_publish(exchange='',
                                    routing_key='loadr-data',
@@ -74,14 +102,24 @@ class RabbitWriter:
                                    properties=properties)
 
     def close(self):
+        """Closes connection to RabbitMQ.
+        """
+
         self.connection.close()
 
 
 def millisec():
+    """Returns a unix timestamp in milliseconds.
+    """
+
     return int(round(time() * 1000))
 
 
 def configdefaults(config):
+    """Setting default data to config and returns it.
+    Maybe rewrite this with collections.defaultdict for simplicity.
+    """
+
     defaults = {'method': 'GET',
                 'headers': None,
                 'body': None,
@@ -96,6 +134,11 @@ def configdefaults(config):
 
 
 def parseconfig(data, history):
+    """Parses request config with history data.
+    Takes content with pattern: "{{from(1).json.data}}" and replaces it
+    with data from previous requests.
+    """
+
     if type(data) is str:
         for match in finditer('{{from\(([^)]+)\)\.(.+?)}}', data):
             if match.group(1) in history:
@@ -103,8 +146,10 @@ def parseconfig(data, history):
                 keys = match.group(2).split('.')
 
                 if keys[0] == 'json':
+                    # JSON data from body
                     prop = prop.json()
                 elif keys[0] == 'headers':
+                    # Data from headers
                     prop = prop.headers
                 else:
                     continue
@@ -134,6 +179,15 @@ def parseconfig(data, history):
 
 
 def send(config, sess, history):
+    """Sends a request specified by config-dict:
+    {
+        "method": "POST",
+        "url": "https://some-host",
+        "header": { advanced-session-header-with-content-type },
+        "body": { some-data }
+    }
+    """
+
     config = parseconfig(config, history)
     req = Request(config['method'],
                   config['url'],
@@ -144,6 +198,12 @@ def send(config, sess, history):
 
 
 def singlerepeater(repeat, writer, config):
+    """A request repeater. It runs through the request config x times,
+    where x is repeat.
+
+    It'll create a new requests.Session and history record for each repeat.
+    """
+
     out = writer[0](*writer[1:])
     out.wait()
 
@@ -183,6 +243,9 @@ def singlerepeater(repeat, writer, config):
 
 
 def multirepeater(concurrency, repeat, writer, requestconfig):
+    """Setting up multiple singlerepeaters by threading for true concurrency.
+    """
+
     config = configdefaults(requestconfig)
     processes = [Process(target=singlerepeater,
                          args=(repeat, writer, config))
@@ -196,6 +259,9 @@ def multirepeater(concurrency, repeat, writer, requestconfig):
 
 
 if __name__ == '__main__':
+    """Stand-alone executable. This is how it is run on the worker instances.
+    """
+
     if len(sys.argv) < 4:
         sys.stderr.write('Too few arguments. 3 required: concurrency, repeat and requests.')
         sys.exit(2)

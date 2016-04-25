@@ -59,8 +59,6 @@ class TestMessenger(TestCase):
                                       routing_key='loadr-data',
                                       body='test')
 
-            #messenger.wait()
-
             waiters = [messenger.connect(), messenger.listen()]
             loop = asyncio.get_event_loop()
             loop.run_until_complete(asyncio.wait(waiters))

@@ -29,16 +29,25 @@ class Session:
     the same output Queue.
 
     The Session workflow are as follows:
-        1. s = Session(Queue)
-        2. s.providers({"provider-name": {"type": "<provider-type",
-                                         ... provider-config }})
-        3. s.start({"provider": "<provider-name>",
-                    "instances": <number-of-instances>,
-                    "concurrency": <number-of-simultaneous-requests>,
-                    "repeat": <request-repeatness>})
-        4. s.requests({ request-config })
-        5. s.run()
-        6. s.stop()
+
+        +---------+
+      +-+ Session |
+      | +---------+---------------------------------------------+   +--------------------------+
+    1.+-> providers({"provider-name": {"type": "provider-type", +---> providers.get_provider() |
+      | |                             ... provider-config }})   |   +-+------------------------+
+      | +-------------------------------------------------------+     |
+    2.+-> start({"provider": "<provider-name>",                 |     |
+      | |        "instances": <number-of-instances>,            |     |
+      | |        "concurrency": <simultaneous-requests>,        |   +-v--------+
+      | |        "repeat": <repeat-requests-x-times>})          +-+ | Provider |
+      | +-------------------------------------------------------+ | +----------+---------------+
+    3.+-> requests(<requests-list>)                             | +-> create_instances()       |
+      | +-------------------------------------------------------+   +--------------------------+
+    4.+-> run()                                                 +---> run_multiple_workers()   |
+      | +-------------------------------------------------------+   +--------------------------+
+    5.+-> stop()                                                +---> remove_instances()       |
+        +-------------------------------------------------------+   +--------------------------+
+
     """
 
     def __init__(self, output):

@@ -34,24 +34,34 @@ from providers import Messenger
 
 
 class Awsec2:
-    """Creates EC2 instances at AWS
-    and then either runs workers in these instances,
-    or create nested instances and proxies their output.
-
-    The nested instances-stuff is not implemented yet.
+    """Creates EC2 instances at AWS and then runs workers in these instances.
+    It'll create one RabbitMQ instance per x worker instances. The RabbitMQ
+    instances are controlled by the Messenger-class. They'll sends a
+    start-signal to the workers and recieves incoming data.
     """
 
+    # How many worker instances per RabbitMQ
     instances_per_messenger = 20
+    # How many simultaneous ssh connections for setting up the environments.
     concurrent_ssh_sessions = 10
+    # How many times to retry the ssh connections before giving up.
     ssh_retries = 10
+    # How long to wait before next ssh connection retry.
     ssh_retry_timeout = 10
+    # When to give up connection if no response.
     ssh_timeout = 60
+    # How long to wait before instances are ready after bootstrapping.
     bootscript_wait_timeout = 60
 
+    # RabbitMQ AWS EC2 image id
     messengers_image_id = 'ami-e2df388d'
+    # RabbitMQ AWS EC2 instance type
     messengers_type = 't2.medium'
+    # RabbitMQ randomized username - created when messenger instance is created.
     messengers_username = ''
+    # RabbitMQ randomized password - created when messenger instance is created.
     messengers_password = ''
+    # RabbitMQ bootstrap script. Installs RabbitMQ and starts it.
     messengers_bootscript = """#!/bin/bash
 yum update -y
 wget http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
@@ -67,15 +77,13 @@ rabbitmqctl add_user {username} {password}
 rabbitmqsql set_permissions {username} ".*" ".*" ".*"
 """
 
+    # Worker bootstrap script. Installs python 3.4 with pika and requests modules
     workers_bootscript = """#!/bin/bash
 yum update -y
 yum install -y python34 python34-pip
 alternatives --set python /usr/bin/python3.4
 pip install pika requests
 """
-    """Lines of bash that will run when the workers instances initializes
-    """
-
 
     def __init__(self, output, image_id, instance_type, **kwargs):
         # All output in a single queue
@@ -97,6 +105,10 @@ pip install pika requests
         self.instances = []
 
     def get_messenger_url(self, messenger):
+        """Returns an URL to a RabbitMQ messenger by username, password,
+        and public dns name.
+        """
+
         return 'amqp://{}:{}@{}:5672'.format(
             self.messengers_username,
             self.messengers_password,
@@ -319,6 +331,9 @@ pip install pika requests
                 processes.append(mp.Process(target=self.run_single_worker,
                                             args=(instance, messenger,
                                                   concurrency, repeat, requests)))
+
+        # This is not correct!
+        # Rewrite this!
 
         for i in range(0, self.concurrent_ssh_sessions - 1):
             # Start processes
