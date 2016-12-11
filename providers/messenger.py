@@ -50,7 +50,8 @@ class Messenger:
     def __init__(self, url, starttime, output):
         """
             url = RabbitMQ-url
-            starttime = When to start the instances requests, unix timestamp
+            starttime = When to start the instances requests,
+                        unix timestamp
             output = Queue
         """
 
@@ -69,11 +70,12 @@ class Messenger:
         self.connection = pika.BlockingConnection(parameters)
         self.channel = self.connection.channel()
 
-        self.channel.queue_declare(queue='loadr-signal')
+        self.channel.exchange_declare(exchange='loadr-signal',
+                                      exchange_type='fanout')
         self.channel.queue_declare(queue='loadr-data')
 
-        self.channel.basic_publish(exchange='',
-                                   routing_key='loadr-signal',
+        self.channel.basic_publish(exchange='loadr-signal',
+                                   routing_key='',
                                    body=str(self.starttime))
 
     @asyncio.coroutine

@@ -18,7 +18,6 @@ along with loadr.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import docker
-import json
 import pika
 import sys
 
@@ -65,10 +64,12 @@ class TestWriter:
 class TestWrkloadr(TestCase):
 
     def test_parseconfig(self):
-        history = {'0': HistoryMockup({'Content-Type': 'application/json'},
-                     {'some-content': {'subcontent': 'ok'}}),
-                   '1': HistoryMockup({'Some-custom-header': 'data'},
-                     {'super-content': '123'})}
+        history = {'0': HistoryMockup(
+                            {'Content-Type': 'application/json'},
+                            {'some-content': {'subcontent': 'ok'}}),
+                   '1': HistoryMockup(
+                            {'Some-custom-header': 'data'},
+                            {'super-content': '123'})}
 
         data = {'headers': {
                 'custom-header': '{{from(0).json.some-content.subcontent}} value and {{from(1).headers.Some-custom-header}}'},
@@ -120,18 +121,17 @@ class TestWrkloadr(TestCase):
 
         wrkloadr.multirepeater(2, 3, (TestWriter, self, lines),
                                [{'method': 'GET',
-                                  'url': 'http://thebrewery.se/',
-                                  'headers': None,
-                                  'body': None,
-                                  'repeat': 1},
-                                 {'method': 'GET',
-                                  'url': 'http://thebrewery.se/',
-                                  'headers': None,
-                                  'body': None,
-                                  'repeat': 2}])
+                                 'url': 'http://thebrewery.se/',
+                                 'headers': None,
+                                 'body': None,
+                                 'repeat': 1},
+                                {'method': 'GET',
+                                 'url': 'http://thebrewery.se/',
+                                 'headers': None,
+                                 'body': None,
+                                 'repeat': 2}])
 
         self.assertEqual(lines.value, 18)
-
 
     def test_csvwriter(self):
         stream = StringIO()
@@ -145,7 +145,8 @@ class TestWrkloadr(TestCase):
 
     def test_rabbitwriter(self):
         client = docker.Client(base_url='unix://var/run/docker.sock')
-        hostconfig = client.create_host_config(port_bindings={'5672':5672})
+        hostconfig = client.create_host_config(
+                        port_bindings={'5672': 5672})
         container = client.create_container(image='rabbitmq:3',
                                             ports=[5672],
                                             host_config=hostconfig)
@@ -159,19 +160,21 @@ class TestWrkloadr(TestCase):
             parameters = pika.URLParameters(url)
             connection = pika.BlockingConnection(parameters)
             channel = connection.channel()
-            channel.queue_declare(queue='loadr-signal',
-                                  durable=False)
+            channel.exchange_declare(exchange='loadr-signal',
+                                     exchange_type='fanout')
             properties = pika.BasicProperties(content_type='text/plain')
-            channel.basic_publish(exchange='',
-                                  routing_key='loadr-signal',
-                                  body=str(round(wrkloadr.millisec() / 1000) + 2))
+            channel.basic_publish(exchange='loadr-signal',
+                                  routing_key='',
+                                  body=str(round(
+                                      wrkloadr.millisec() / 1000) + 2))
 
             rabbit = wrkloadr.RabbitWriter(url)
             rabbit.wait()
             rabbit.write(*range(3))
             rabbit.close()
 
-            method_frame, properties, body = channel.basic_get(queue='loadr-data')
+            method_frame, properties, body = channel.basic_get(
+                                                queue='loadr-data')
 
             self.assertEqual(body.decode(), '0,1,2')
 
@@ -180,4 +183,3 @@ class TestWrkloadr(TestCase):
             client.stop(container=cid)
             client.remove_container(container=cid)
             client.close()
-

@@ -21,7 +21,7 @@ import json
 import pika
 import sys
 
-from multiprocessing import Process, Queue
+from multiprocessing import Process
 from requests import Request, Session, ConnectionError
 from re import finditer
 from time import time, sleep
@@ -70,15 +70,21 @@ class RabbitWriter:
         parameters = pika.URLParameters(url)
         self.connection = pika.BlockingConnection(parameters)
         self.channel = self.connection.channel()
-        self.channel.queue_declare(queue='loadr-data',
-                                   durable=False)
+        queue = self.channel.queue_declare()
+        self.channel.exchange_declare(exchange='loadr-signal',
+                                      exchange_type='fanout')
+        self.channel.queue_bind(exchange='loadr-signal',
+                                queue=queue.method.queue)
+
+        self.queue = queue.method.queue
 
     def wait(self):
         """Wait until there's a start-signal from RabbitMQ server.
         """
 
         while True:
-            method_frame, properties, body = self.channel.basic_get(queue='loadr-signal')
+            method_frame, properties, body = self.channel.basic_get(
+                queue=self.queue)
 
             if body is not None:
                 break
@@ -263,7 +269,9 @@ if __name__ == '__main__':
     """
 
     if len(sys.argv) < 4:
-        sys.stderr.write('Too few arguments. 3 required: concurrency, repeat and requests.')
+        sys.stderr.write(
+            'Too few arguments. 3 required: concurrency, ' +
+            'repeat and requests.')
         sys.exit(2)
 
     if len(sys.argv) > 4:
