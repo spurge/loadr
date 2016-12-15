@@ -72,11 +72,13 @@ class TestWrkloadr(TestCase):
                             {'super-content': '123'})}
 
         data = {'headers': {
-                'custom-header': '{{from(0).json.some-content.subcontent}} value and {{from(1).headers.Some-custom-header}}'},
-               'body': {
+                'custom-header':
+                    '{{from(0).json.some-content.subcontent}} ' +
+                    'value and {{from(1).headers.Some-custom-header}}'},
+                'body': {
                    'from-header-0': {
                        'header': '{{from(0).headers.Content-Type}}/stuff'},
-                    'from-body-1': 'body: {{from(1).json.super-content}}'}}
+                   'from-body-1': 'body: {{from(1).json.super-content}}'}}
 
         parsed = wrkloadr.parseconfig(data, history)
 
@@ -160,15 +162,18 @@ class TestWrkloadr(TestCase):
             parameters = pika.URLParameters(url)
             connection = pika.BlockingConnection(parameters)
             channel = connection.channel()
+
             channel.exchange_declare(exchange='loadr-signal',
                                      exchange_type='fanout')
-            properties = pika.BasicProperties(content_type='text/plain')
+            channel.queue_declare(queue='loadr-data')
+
+            rabbit = wrkloadr.RabbitWriter(url)
+
             channel.basic_publish(exchange='loadr-signal',
                                   routing_key='',
                                   body=str(round(
                                       wrkloadr.millisec() / 1000) + 2))
 
-            rabbit = wrkloadr.RabbitWriter(url)
             rabbit.wait()
             rabbit.write(*range(3))
             rabbit.close()
