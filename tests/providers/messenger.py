@@ -32,7 +32,7 @@ class TestMessenger(TestCase):
 
     def test_messenger(self):
         client = docker.Client(base_url='unix://var/run/docker.sock')
-        hostconfig = client.create_host_config(port_bindings={'5672':5672})
+        hostconfig = client.create_host_config(port_bindings={'5672': 5672})
         container = client.create_container(image='rabbitmq:3',
                                             ports=[5672],
                                             host_config=hostconfig)
@@ -51,6 +51,12 @@ class TestMessenger(TestCase):
             connection = pika.BlockingConnection(parameters)
             channel = connection.channel()
 
+            queue = channel.queue_declare()
+            channel.exchange_declare(exchange='loadr-signal',
+                                     exchange_type='fanout')
+            channel.queue_bind(exchange='loadr-signal',
+                               queue=queue.method.queue)
+
             channel.queue_declare(queue='loadr-data',
                                   durable=False)
 
@@ -65,7 +71,7 @@ class TestMessenger(TestCase):
 
             lines = 0
 
-            m, p, b = channel.basic_get(queue='loadr-signal')
+            m, p, b = channel.basic_get(queue=queue.method.queue)
             self.assertEqual(b.decode(), str(starttime))
 
             while True:
