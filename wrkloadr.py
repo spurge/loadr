@@ -70,11 +70,14 @@ class RabbitWriter:
         parameters = pika.URLParameters(url)
         self.connection = pika.BlockingConnection(parameters)
         self.channel = self.connection.channel()
+
         queue = self.channel.queue_declare()
         self.channel.exchange_declare(exchange='loadr-signal',
                                       exchange_type='fanout')
         self.channel.queue_bind(exchange='loadr-signal',
                                 queue=queue.method.queue)
+
+        self.channel.queue_declare(queue='loadr-data')
 
         self.queue = queue.method.queue
 
